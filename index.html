@@ -51,19 +51,45 @@
     font-family: inherit;
   }
   input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
-  button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
+   /* Контейнер для кнопок — выравнивает по одной линии */
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 16px;
+  }
+
+  /* Общий стиль кнопок (без margin — отступ задаёт контейнер) */
+  .btn {
     padding: 10px 20px;
     border-radius: 6px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 12px;
+    font-family: inherit;
+    border: 1px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    margin: 0;
   }
-  button:hover { background: var(--accent-hover); }
-  button:disabled { background: var(--muted); cursor: not-allowed; }
+  .btn:disabled { cursor: not-allowed; }
+
+  /* Основная кнопка — синяя */
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-primary:disabled { background: var(--muted); border-color: var(--muted); }
+
+  /* Вторичная кнопка — белая с синей рамкой */
+  .btn-secondary {
+    background: #fff;
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .btn-secondary:hover:not(:disabled) { background: #f0f6ff; }
   .summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -95,6 +121,68 @@
   .hidden { display: none; }
   details { margin-top: 12px; }
   summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  /* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--card);
+  border-radius: 10px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { margin: 0; font-size: 18px; }
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 0;
+}
+.modal-close:hover { color: var(--text); background: none; }
+.modal-body {
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+.modal-body h3 {
+  font-size: 15px;
+  margin: 20px 0 8px;
+  color: var(--text);
+}
+.modal-body h3:first-child { margin-top: 0; }
+.modal-body ul, .modal-body ol { margin: 6px 0 10px; padding-left: 22px; }
+.modal-body li { margin-bottom: 4px; }
+.modal-body code {
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+.modal-body p { margin: 8px 0; }
 </style>
 </head>
 <body>
@@ -128,7 +216,10 @@
         <input type="number" id="maxContainers" value="108" min="1" step="1">
       </div>
     </div>
-    <button id="runBtn">Рассчитать</button>
+       <div class="actions">
+      <button id="runBtn" class="btn btn-primary">Рассчитать</button>
+      <button id="helpBtn" class="btn btn-secondary">📖 Описание алгоритма</button>
+    </div>
   </div>
 
   <div id="results" class="hidden">
@@ -138,6 +229,93 @@
         <summary>Результат (текст)</summary>
         <pre id="output"></pre>
       </details>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно с описанием алгоритма -->
+<div id="helpModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="helpTitle">Алгоритм распределения рулонов по КТК</h2>
+      <button id="helpClose" class="modal-close" aria-label="Закрыть">×</button>
+    </div>
+    <div class="modal-body">
+      <p>Алгоритм решает задачу <b>упаковки рулонов в контейнеры (КТК)</b> с ограничениями по массе и диаметру. Цель — минимизировать число КТК и как можно плотнее подойти снизу к предельной грузоподъёмности <b>33.5 т</b> на каждый КТК.</p>
+
+      <h3>1. Входные данные</h3>
+      <ul>
+        <li>Список рулонов: для каждого известны <b>масса</b> (т) и <b>внешний диаметр</b> (мм).</li>
+        <li>Диаметр вычисляется по формуле: <code>D = √(162196 · M / W + D_внут²)</code>, где <code>M</code> — масса в кг, <code>W = 1340 мм</code> — ширина, <code>D_внут = 500 мм</code>.</li>
+        <li>Тип КТК: <b>3 места</b> или <b>4 места</b>. У каждого места свои ограничения по массе и диаметру.</li>
+        <li>Максимальное число КТК (по умолчанию 108).</li>
+      </ul>
+
+      <h3>2. Схемы загрузки (паттерны)</h3>
+      <p>Каждый тип КТК имеет <b>оцифрованную схему</b> — последовательность проходов, на каждом из которых заполняется определённое место:</p>
+      <ul>
+        <li><b>3-местный:</b> <code>"010" → "101" → "111"</code>
+          <ul>
+            <li>Проход 1: центр (поз. 2), D ≤ 2200 мм.</li>
+            <li>Проход 2: рулон <b>перекладывается</b> из центра на левый край (поз. 1, D ≤ 1900), и кладётся новый в правый край (поз. 3, D ≤ 1900).</li>
+            <li>Проход 3: кладётся новый в центр (поз. 2), D ≤ 1600.</li>
+          </ul>
+        </li>
+        <li><b>4-местный:</b> <code>"1000" → "1001" → "1101" → "1111"</code>
+          <ul>
+            <li>Проход 1: поз. 1 (D ≤ 1650, m ≤ 17 т).</li>
+            <li>Проход 2: поз. 4 (D ≤ 1650, m ≤ 17 т).</li>
+            <li>Проход 3: поз. 2 (D ≤ 1400, m ≤ 16 т).</li>
+            <li>Проход 4: поз. 3 (D ≤ 1200, m ≤ 16 т).</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>3. Подготовка</h3>
+      <ol>
+        <li><b>Предфильтр.</b> Рулоны, которые не проходят ни в один шаг ни по массе, ни по диаметру, выносятся в отдельный список <b>«Неразместимые»</b> и в расчёте не участвуют.</li>
+        <li><b>Сортировка.</b> Остальные рулоны сортируются по убыванию массы (при равенстве — по убыванию диаметра). Так «неудобные» (тяжёлые и крупные) рулоны размещаются первыми, а лёгкие идут в «добивку».</li>
+      </ol>
+
+      <h3>4. Основной цикл — «змейка» по КТК</h3>
+      <p>Для каждого прохода схемы выполняется обход <b>всех КТК</b>. Направление обхода <b>чередуется</b> между проходами:</p>
+      <ul>
+        <li>Проход 1 — слева направо (КТК 1 → 108).</li>
+        <li>Проход 2 — справа налево (КТК 108 → 1).</li>
+        <li>Проход 3 — снова слева направо, и т. д.</li>
+      </ul>
+      <p>На каждом шаге для текущего КТК выполняется действие прохода:</p>
+      <ul>
+        <li><b>PlaceNew</b> — в указанное место кладётся <b>самый тяжёлый из оставшихся рулонов</b>, который проходит по массе и диаметру <i>и</i> не превышает суммарный лимит КТК (33.5 т).</li>
+        <li><b>MoveExisting</b> — рулон перекладывается из одного места в другое (только для 3-местного). Если перекладывание <b>невозможно</b> (рулон не проходит по диаметру нового места), КТК <b>закрывается</b> — больше в него ничего не кладётся.</li>
+      </ul>
+      <p>Если на текущем шаге ни один рулон не подошёл под свободное место — шаг просто пропускается, КТК переходит к следующему проходу.</p>
+
+      <h3>5. Завершение</h3>
+      <ul>
+        <li>Алгоритм останавливается, когда <b>закончились рулоны</b> или <b>закончились проходы схемы</b>.</li>
+        <li>Рулоны, которые не удалось разместить из-за нехватки КТК/мест, попадают в список <b>«Остаток»</b>.</li>
+        <li>Рулоны, физически не проходящие ни в одно место, — в список <b>«Неразместимые»</b>.</li>
+      </ul>
+
+      <h3>6. Что показывает результат</h3>
+      <ul>
+        <li><b>КТК загружено</b> — сколько контейнеров использовано.</li>
+        <li><b>Средняя загрузка</b> — средняя масса на один КТК (чем ближе к 33.5 т, тем лучше).</li>
+        <li><b>Средний остаток</b> — сколько в среднем «не добрано» до лимита.</li>
+        <li>Строки вида <code>КТК#001 [9.00, 7.89, —, —]: 16.89/33.5 т</code> — состав каждого КТК по позициям (<code>—</code> = пусто).</li>
+      </ul>
+
+      <h3>7. Особенности и ограничения</h3>
+      <ul>
+        <li>Алгоритм <b>жадно-эвристический</b> (не гарантирует математический оптимум), но за счёт «змейки» даёт <b>равномерную</b> загрузку КТК и хорошо работает на реальных партиях.</li>
+        <li>Если рулонов физически больше, чем могут вместить доступные КТК, часть уйдёт в «Остаток» — это не ошибка, а ограничение числа контейнеров.</li>
+        <li>Диаметры и массы мест можно менять в коде (объекты <code>SlotSpec</code> и <code>PatternAction</code>) — алгоритм не требует переписывания.</li>
+      </ul>
+
+      <p style="color: var(--muted); font-size: 13px; margin-top: 20px;">
+        Партия рулонов генерируется случайно при каждом запуске (seed берётся из текущего времени), поэтому два запуска подряд дают разные данные. Это сделано специально — чтобы можно было оценить устойчивость алгоритма на разных партиях.
+      </p>
     </div>
   </div>
 </div>
@@ -478,6 +656,34 @@ $("runBtn").addEventListener("click", () => {
       btn.textContent = "Рассчитать";
     }
   }, 20);
+});
+
+// ===================== МОДАЛЬНОЕ ОКНО =====================
+
+const helpModal = $("helpModal");
+const helpBtn = $("helpBtn");
+const helpClose = $("helpClose");
+
+function openHelp() {
+  helpModal.classList.remove("hidden");
+  document.body.style.overflow = "hidden"; // блокируем скролл фона
+}
+function closeHelp() {
+  helpModal.classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+helpBtn.addEventListener("click", openHelp);
+helpClose.addEventListener("click", closeHelp);
+
+// Закрытие по клику на затемнённый фон
+helpModal.addEventListener("click", (e) => {
+  if (e.target === helpModal) closeHelp();
+});
+
+// Закрытие по Esc
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !helpModal.classList.contains("hidden")) closeHelp();
 });
 </script>
 </body>
