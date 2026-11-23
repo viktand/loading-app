@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Расчёт погрузки рулонов в КТК</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --accent-hover: #0550ae;
+    --text: #1f2328;
+    --muted: #656d76;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --err: #cf222e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { background: var(--muted); cursor: not-allowed; }
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .stat .value.ok { color: var(--ok); }
+  .stat .value.warn { color: var(--warn); }
+  .stat .value.err { color: var(--err); }
+  pre {
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.45;
+    max-height: 600px;
+    overflow-y: auto;
+    white-space: pre;
+  }
+  .hidden { display: none; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Расчёт погрузки рулонов в КТК</h1>
+  <div class="subtitle">Оптимизация по массе и габаритам. Лимит массы КТК — 33.5 т.</div>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label for="n">Количество рулонов</label>
+        <input type="number" id="n" value="100" min="1" step="1">
+      </div>
+      <div>
+        <label for="minW">Мин. вес рулона, т</label>
+        <input type="number" id="minW" value="5" min="0" step="0.01">
+      </div>
+      <div>
+        <label for="maxW">Макс. вес рулона, т</label>
+        <input type="number" id="maxW" value="17" min="0" step="0.01">
+      </div>
+      <div>
+        <label for="slots">Тип КТК</label>
+        <select id="slots">
+          <option value="3">3 места</option>
+          <option value="4" selected>4 места</option>
+        </select>
+      </div>
+      <div>
+        <label for="maxContainers">Макс. КТК</label>
+        <input type="number" id="maxContainers" value="500" min="1" step="1">
+      </div>
+      <div>
+        <label for="seed">Seed (для воспроизводимости)</label>
+        <input type="number" id="seed" value="42" step="1">
+      </div>
+    </div>
+    <button id="runBtn">Рассчитать</button>
+    <div class="hint">При больших партиях расчёт может занять несколько секунд.</div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="card">
+      <div class="summary" id="summary"></div>
+      <details open>
+        <summary>Результат (текст)</summary>
+        <pre id="output"></pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ===================== МОДЕЛИ =====================
+
+class Roll {
+  constructor(id, massTon) {
+    this.id = id;
+    this.massTon = massTon;
+    this.widthMm = 1340;
+    this.innerDiameterMm = 500;
+  }
+  get massKg() { return this.massTon * 1000; }
+  get outerDiameterMm() {
+    return Math.sqrt(162196 * this.massKg / this.widthMm + this.innerDiameterMm ** 2);
+  }
+  toString() {
+    return `R${String(this.id).padStart(3, "0")} (${this.massTon.toFixed(2)} т, D=${this.outerDiameterMm.toFixed(0)} мм)`;
+  }
+}
+
+class SlotSpec {
+  constructor(position, maxMassTon, maxDiameterMm) {
+    this.position = position;
+    this.maxMassTon = maxMassTon;
+    this.maxDiameterMm = maxDiameterMm;
+  }
+}
+
+class PatternAction {
+  constructor(type, target, source, maxMass, maxD) {
+    this.type = type;              // "place" | "move"
+    this.targetPosition = target;
+    this.sourcePosition = source;  // null для place
+    this.maxMassTon = maxMass;
+    this.maxDiameterMm = maxD;
+  }
+  static placeNew(pos, maxMass, maxD) { return new PatternAction("place", pos, null, maxMass, maxD); }
+  static moveExisting(from, to, maxMass, maxD) { return new PatternAction("move", to, from, maxMass, maxD); }
+  toString() {
+    return this.type === "place"
+      ? `PlaceNew(поз.${this.targetPosition}, D≤${this.maxDiameterMm}, m≤${this.maxMassTon})`
+      : `Move(поз.${this.sourcePosition}→${this.targetPosition}, D≤${this.maxDiameterMm}, m≤${this.maxMassTon})`;
+  }
+}
+
+class LoadingPattern {
+  constructor(name, passes) {
+    this.name = name;
+    this.passes = passes;  // [[PatternAction], ...]
+  }
+  describe() {
+    return this.passes.map((p, i) => `проход ${i + 1}: [${p.map(a => a.toString()).join(", ")}]`).join(" | ");
+  }
+  static threeSlot() {
+    return new LoadingPattern("3-slot (010→101→111)", [
+      [PatternAction.placeNew(2, 33.5, 2200)],
+      [
+        PatternAction.moveExisting(2, 1, 33.5, 1900),
+        PatternAction.placeNew(3, 33.5, 1900),
+      ],
+      [PatternAction.placeNew(2, 33.5, 1600)],
+    ]);
+  }
+  static fourSlot() {
+    return new LoadingPattern("4-slot (1000→1001→1101→1111)", [
+      [PatternAction.placeNew(1, 17, 1650)],
+      [PatternAction.placeNew(4, 17, 1650)],
+      [PatternAction.placeNew(2, 16, 1400)],
+      [PatternAction.placeNew(3, 16, 1200)],
+    ]);
+  }
+}
+
+class Container {
+  constructor(number, maxMassTon, slots) {
+    this.number = number;
+    this.maxMassTon = maxMassTon;
+    this.slots = slots;
+    this.rolls = new Array(slots.length).fill(null);
+  }
+  get currentMass() { return this.rolls.reduce((s, r) => s + (r ? r.massTon : 0), 0); }
+  get remainingMass() { return this.maxMassTon - this.currentMass; }
+  get occupiedSlots() { return this.rolls.filter(r => r !== null).length; }
+  get freeSlots() { return this.rolls.length - this.occupiedSlots; }
+  isSlotFree(position) { return this.rolls[position - 1] === null; }
+  getAt(position) { return this.rolls[position - 1]; }
+  canPlace(position, maxMass, maxD, roll) {
+    const idx = position - 1;
+    if (this.rolls[idx] !== null) return false;
+    if (roll.massTon > maxMass + 1e-9) return false;
+    if (roll.outerDiameterMm > maxD + 1e-9) return false;
+    if (this.currentMass + roll.massTon > this.maxMassTon + 1e-9) return false;
+    return true;
+  }
+  place(position, roll) { this.rolls[position - 1] = roll; }
+  move(from, to) {
+    this.rolls[to - 1] = this.rolls[from - 1];
+    this.rolls[from - 1] = null;
+  }
+  toString() {
+    const parts = this.rolls.map(r => r === null ? "—" : r.massTon.toFixed(2));
+    return `КТК#${String(this.number).padStart(3, "0")} [${parts.join(", ")}]: ${this.currentMass.toFixed(2)}/${this.maxMassTon.toFixed(1)} т`;
+  }
+}
+
+// ===================== SOLVER =====================
+
+class LoadingSolver {
+  constructor(slots, maxMassPerContainer, maxContainers, pattern) {
+    this.slots = slots;
+    this.maxMassPerContainer = maxMassPerContainer;
+    this.maxContainers = maxContainers;
+    this.pattern = pattern;
+    this.EPS = 1e-9;
+  }
+
+  solve(inputRolls) {
+    const result = { containers: [], unplaceable: [], leftover: [] };
+    const EPS = this.EPS;
+
+    // 1. Предфильтр
+    const rolls = [];
+    for (const r of inputRolls) {
+      let fitsAny = false;
+      for (const pass of this.pattern.passes) {
+        for (const act of pass) {
+          if (r.massTon <= act.maxMassTon + EPS && r.outerDiameterMm <= act.maxDiameterMm + EPS) {
+            fitsAny = true; break;
+          }
+        }
+        if (fitsAny) break;
+      }
+      if (fitsAny) rolls.push(r); else result.unplaceable.push(r);
+    }
+    if (rolls.length === 0) return result;
+
+    // 2. Сортировка по убыванию массы, затем по диаметру
+    rolls.sort((a, b) => {
+      if (b.massTon !== a.massTon) return b.massTon - a.massTon;
+      return b.outerDiameterMm - a.outerDiameterMm;
+    });
+
+    // 3. КТК
+    const containers = [];
+    for (let i = 1; i <= this.maxContainers; i++) {
+      containers.push(new Container(i, this.maxMassPerContainer, this.slots));
+    }
+    const closed = new Array(containers.length).fill(false);
+
+    // 4. Проходы
+    for (let passIdx = 0; passIdx < this.pattern.passes.length && rolls.length > 0; passIdx++) {
+      const pass = this.pattern.passes[passIdx];
+      const forward = passIdx % 2 === 0;
+
+      for (let step = 0; step < containers.length && rolls.length > 0; step++) {
+        const idx = forward ? step : containers.length - 1 - step;
+        if (closed[idx]) continue;
+        const c = containers[idx];
+
+        for (const action of pass) {
+          if (action.type === "move") {
+            const src = action.sourcePosition;
+            const dst = action.targetPosition;
+            if (!c.isSlotFree(src) && c.isSlotFree(dst)) {
+              const moving = c.getAt(src);
+              if (moving.massTon <= action.maxMassTon + EPS && moving.outerDiameterMm <= action.maxDiameterMm + EPS) {
+                c.move(src, dst);
+              } else {
+                closed[idx] = true; // перекладывание невозможно → КТК закрыт
+              }
+            }
+          } else { // place
+            const pos = action.targetPosition;
+            if (c.isSlotFree(pos)) {
+              let found = -1;
+              for (let i = 0; i < rolls.length; i++) {
+                if (c.canPlace(pos, action.maxMassTon, action.maxDiameterMm, rolls[i])) { found = i; break; }
+              }
+              if (found >= 0) {
+                c.place(pos, rolls[found]);
+                rolls.splice(found, 1);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    result.leftover = rolls;
+    result.containers = containers.filter(c => c.occupiedSlots > 0);
+    return result;
+  }
+}
+
+// ===================== ГЕНЕРАЦИЯ И ВЫВОД =====================
+
+// Детерминированный ПСЧ (mulberry32) — чтобы seed работал воспроизводимо
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function generateRolls(n, minW, maxW, seed) {
+  const rnd = mulberry32(seed);
+  const rolls = [];
+  for (let i = 1; i <= n; i++) {
+    const w = minW + rnd() * (maxW - minW);
+    rolls.push(new Roll(i, Math.round(w * 1000) / 1000));
+  }
+  return rolls;
+}
+
+function fmt(x, d = 2) { return x.toFixed(d).replace(".", ","); }
+
+function buildOutput(result, slotsCount, maxMass, slotSpecs) {
+  const lines = [];
+  lines.push("=== РЕЗУЛЬТАТ ПОГРУЗКИ ===");
+  lines.push(`Тип КТК: ${slotsCount} места, суммарный лимит ${fmt(maxMass, 1)} т`);
+  lines.push(`Использовано КТК: ${result.containers.length}`);
+  lines.push("");
+  lines.push("--- КТК ---");
+  for (const c of result.containers) lines.push(c.toString());
+
+  if (result.unplaceable.length > 0) {
+    lines.push("");
+    lines.push(`--- Неразместимые (${result.unplaceable.length}) ---`);
+    for (const r of result.unplaceable) lines.push("  " + r.toString());
+  }
+  if (result.leftover.length > 0) {
+    lines.push("");
+    lines.push(`--- Остаток (${result.leftover.length}) ---`);
+    for (const r of result.leftover) lines.push("  " + r.toString());
+  }
+  return lines.join("\n");
+}
+
+function buildSummary(result) {
+  const placedMass = result.containers.reduce((s, c) => s + c.currentMass, 0);
+  const avgLoad = result.containers.length ? placedMass / result.containers.length : 0;
+  const avgRem = result.containers.length
+    ? result.containers.reduce((s, c) => s + c.remainingMass, 0) / result.containers.length
+    : 0;
+
+  const stats = [
+    { label: "КТК загружено", value: result.containers.length },
+    { label: "Рулонов размещено", value: `${result.containers.reduce((s, c) => s + c.occupiedSlots, 0)} (${fmt(placedMass)} т)` },
+    { label: "Неразместимых", value: result.unplaceable.length, cls: result.unplaceable.length ? "err" : "ok" },
+    { label: "Остаток", value: result.leftover.length, cls: result.leftover.length ? "warn" : "ok" },
+    { label: "Средняя загрузка", value: `${fmt(avgLoad)} т` },
+    { label: "Средний остаток", value: `${fmt(avgRem)} т` },
+  ];
+  return stats.map(s => `
+    <div class="stat">
+      <div class="label">${s.label}</div>
+      <div class="value ${s.cls || ""}">${s.value}</div>
+    </div>`).join("");
+}
+
+// ===================== UI =====================
+
+const $ = id => document.getElementById(id);
+
+$("runBtn").addEventListener("click", () => {
+  const btn = $("runBtn");
+  btn.disabled = true;
+  btn.textContent = "Расчёт…";
+
+  // Даём браузеру перерисовать кнопку
+  setTimeout(() => {
+    try {
+      const n = parseInt($("n").value, 10);
+      const minW = parseFloat($("minW").value);
+      const maxW = parseFloat($("maxW").value);
+      const slotsCount = parseInt($("slots").value, 10);
+      const maxContainers = parseInt($("maxContainers").value, 10);
+      const seed = parseInt($("seed").value, 10) || 42;
+
+      if (!(n > 0)) throw new Error("Количество рулонов должно быть > 0");
+      if (!(minW >= 0) || !(maxW > minW)) throw new Error("Проверьте мин/макс вес");
+      if (maxContainers < 1) throw new Error("Макс. КТК должно быть ≥ 1");
+
+      let maxMassPerContainer, slotSpecs, pattern;
+      if (slotsCount === 3) {
+        maxMassPerContainer = 33.5;
+        slotSpecs = [
+          new SlotSpec(1, 33.5, 1900),
+          new SlotSpec(2, 33.5, 2200),
+          new SlotSpec(3, 33.5, 1600),
+        ];
+        pattern = LoadingPattern.threeSlot();
+      } else {
+        maxMassPerContainer = 33.5;
+        slotSpecs = [
+          new SlotSpec(1, 17, 1650),
+          new SlotSpec(2, 16, 1400),
+          new SlotSpec(3, 16, 1200),
+          new SlotSpec(4, 17, 1650),
+        ];
+        pattern = LoadingPattern.fourSlot();
+      }
+
+      const rolls = generateRolls(n, minW, maxW, seed);
+      const solver = new LoadingSolver(slotSpecs, maxMassPerContainer, maxContainers, pattern);
+      const t0 = performance.now();
+      const result = solver.solve(rolls);
+      const elapsed = (performance.now() - t0).toFixed(0);
+
+      $("summary").innerHTML = buildSummary(result);
+      $("output").textContent = buildOutput(result, slotsCount, maxMassPerContainer, slotSpecs);
+      $("results").classList.remove("hidden");
+      console.log(`Расчёт за ${elapsed} мс`);
+    } catch (e) {
+      alert("Ошибка: " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Рассчитать";
+    }
+  }, 20);
+});
+</script>
+</body>
+</html>
