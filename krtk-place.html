@@ -173,41 +173,54 @@ function renderSummary(items, res) {
     </div>`).join("");
 }
 
-function renderResult(res) {
+  // 1. Отрисовка сформированных платформ
+  function renderResult(res) {
   const area = document.getElementById("resultArea");
 
-  // 1. Отрисовка сформированных платформ
   const platformsHtml = res.platforms.map(p => {
     const boxes = p.containers.map(c => {
       const widthPct = Math.min(100, (c.lengthM / 24.4) * 100).toFixed(1);
+      const massLabel = c.isEmpty
+        ? `пор. (${c.massT.toFixed(1)} т)`
+        : `${c.massT.toFixed(2)} т`;
       return `
         <div class="ktk-box ${c.isEmpty ? "empty" : ""}" style="width: ${widthPct}%;">
           <strong>#${c.id} (${c.type}')</strong>
-          <span>${c.isEmpty ? "пор. (" + c.massT.toFixed(1) + " т)" : c.massT.toFixed(2) + " т"} | ЦТ: ${c.cgMm} мм</span>
+          <span>${massLabel} | ЦТ: ${c.cgMm} мм</span>
         </div>`;
     }).join("");
 
-    // Определяем выравнивание для каждой конкретной платформы:
     const justify = p.centered
       ? "center"
       : (p.edgeAligned ? "space-between" : "flex-start");
+
+    const al = p.axleLoads;
+    const axleWarnStyle = al.isOverloaded ? "color: var(--err); font-weight: 700;" : "color: var(--ok);";
+    const axleLine = `
+      <div style="margin-top: 8px; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span>Брутто вагона (с тарой): <strong>${al.grossMassT.toFixed(2)} т</strong> &nbsp;|&nbsp; Общий ЦТ вагона: <strong>${al.wagonCgMm > 0 ? "+" : ""}${al.wagonCgMm} мм</strong></span>
+        <span style="${axleWarnStyle}">
+          Нагрузка на ось: тел. 1 — <strong>${al.axle1T.toFixed(2)} тс</strong>, тел. 2 — <strong>${al.axle2T.toFixed(2)} тс</strong>
+          (макс. ${al.maxAxleT.toFixed(2)} / ${al.maxAxleAllowed} тс)
+        </span>
+      </div>`;
 
     return `
       <div class="platform-card">
         <div class="platform-header">
           <span>Платформа №${p.index} — ${p.ruleApplied}</span>
-          <span>Масса: ${p.totalMassT.toFixed(2)} / 69.0 т &nbsp;|&nbsp; ${p.meta}</span>
+          <span>Груз: ${p.totalMassT.toFixed(2)} / 69.0 т &nbsp;|&nbsp; ${p.meta}</span>
         </div>
         <div class="slots" style="justify-content: ${justify};">${boxes}</div>
+        ${axleLine}
       </div>`;
   }).join("");
-  
-  // 2. Отрисовка неразмещённого остатка
+
   const unplacedHtml = res.unplaced.length === 0 ? "" : `
     <div class="platform-card" style="border-style: dashed; margin-top: 20px;">
       <div class="platform-header">
         <span>Ожидают размещения (${res.unplaced.length} шт.)</span>
-        <span style="color: var(--muted); font-weight: 400;">Не попали в текущие правила</span>
+        <span style="color: var(--muted); font-weight: 400;">Не попали в правила</span>
       </div>
       <div class="slots" style="flex-wrap: wrap;">
         ${res.unplaced.map(c => `
@@ -220,6 +233,7 @@ function renderResult(res) {
 
   area.innerHTML = (platformsHtml || "<p>По текущим правилам платформ не сформировано.</p>") + unplacedHtml;
 }
+
 
 function init(data) {
   const run = () => {

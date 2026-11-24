@@ -2,16 +2,35 @@
 window.KTK = window.KTK || {};
 
 window.KTK.RULES = {
-  platform: {
+ platform: {
     maxCargoMassT: 69.0,
     loadingLengthM: 24.45,
-    singleLoadedMaxMassT: 36.0, // Любой одиночный гружёный КТК (40', 30', 20') в центре <= 36 т
+    tareMassT: 25.0,          // Масса тары 80-футовой платформы, т
+    baseMm: 19000,            // База платформы (между центрами пятников тележек), мм
+    maxAxleLoadT: 23.5,       // Предельно допустимая нагрузка на ось, тс
+    singleLoadedMaxMassT: 36.0,
     single40MaxMassT: 36.0,
     single30MaxMassT: 36.0,
-    empty40MassT: 4.0,  // Масса порожнего 40', т
-    empty30MassT: 3.1,  // Масса порожнего 30', т
-    empty20MassT: 2.2,  // Масса порожнего 20', т
+    empty40MassT: 4.0,
+    empty30MassT: 3.1,
+    empty20MassT: 2.2,
     comboEmpty20_40_Max40MassT: 36.0,
+  },
+  
+  // Штатные координаты центров контейнеров (мм) относительно середины 80-футовой платформы
+  slotCentersByScheme: {
+    PAIR_40:         [-6120, 6120],
+    PAIR_30_EDGES:   [-7650, 7650],
+    TRIPLE_30:       [-7650, 0, 7650],
+    QUAD_20:         [-9180, -3060, 3060, 9180],
+    TRIPLE_20:       [-9180, 0, 9180],
+    PAIR_20_EDGES:   [-9180, 9180],
+    PAIR_20_CENTER:  [-3060, 3060],
+    COMBO_20_40_20:  [-9180, 0, 9180],
+    COMBO_30_20_30:  [-7650, 0, 7650],
+    COMBO_40_20:     [-6120, 9180],
+    COMBO_30_20:     [-7650, 9180],
+    SINGLE_CENTER:	 [0],
   },
 
   // Правило 1: Пара 40' без смещения ЦТ (|m1 - m2| <= maxDiffT)

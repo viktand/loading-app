@@ -1768,6 +1768,51 @@ window.KTK.Solver = {
 
     return { platforms, unplaced };
   },
+  
+  /**
+   * Расчёт осевых нагрузок и продольного смещения общего ЦТ платформы.
+   */
+  calcAxleLoads(containers, slotCentersMm = [], rules) {
+    const tareMassT = rules.platform.tareMassT;
+    const baseMm = rules.platform.baseMm;
+    const maxAxleAllowed = rules.platform.maxAxleLoadT;
+
+    let cargoMassT = 0;
+    let momentTMm = 0;
+
+    for (let i = 0; i < containers.length; i++) {
+      const c = containers[i];
+      const slotX = slotCentersMm?.[i] ?? 0;
+      const actualX = slotX + (c.cgMm || 0);
+
+      cargoMassT += c.massT;
+      momentTMm += c.massT * actualX;
+    }
+
+    const grossMassT = tareMassT + cargoMassT;
+    const wagonCgMm = grossMassT > 0 ? momentTMm / grossMassT : 0;
+
+    // Реакции на 1-ю (левую) и 2-ю (правую) двухосные тележки, т
+    const bogie1T = grossMassT / 2 - momentTMm / baseMm;
+    const bogie2T = grossMassT / 2 + momentTMm / baseMm;
+
+    // Нагрузка на каждую ось (по 2 оси на тележку), тс
+    const axle1T = bogie1T / 2;
+    const axle2T = bogie2T / 2;
+    const maxAxleT = Math.max(axle1T, axle2T);
+
+    return {
+      grossMassT: Math.round(grossMassT * 100) / 100,
+      wagonCgMm: Math.round(wagonCgMm),
+      bogie1T: Math.round(bogie1T * 100) / 100,
+      bogie2T: Math.round(bogie2T * 100) / 100,
+      axle1T: Math.round(axle1T * 100) / 100,
+      axle2T: Math.round(axle2T * 100) / 100,
+      maxAxleT: Math.round(maxAxleT * 100) / 100,
+      maxAxleAllowed,
+      isOverloaded: maxAxleT > maxAxleAllowed + 1e-6,
+    };
+  },
 
 
   /**
@@ -1901,10 +1946,15 @@ window.KTK.Solver = {
     allPlatforms.push(...finalRes.platforms);
 
     // Нумеруем итоговые платформы
-    const platforms = allPlatforms.map((p, idx) => ({
-      index: idx + 1,
-      ...p
-    }));
+    const platforms = allPlatforms.map((p, idx) => {
+      const slotCenters = rules.slotCentersByScheme[p.scheme];
+      const axleLoads = this.calcAxleLoads(p.containers, slotCenters, rules);
+      return {
+        index: idx + 1,
+        ...p,
+        axleLoads,
+      };
+    });
 
     return {
       platforms,
