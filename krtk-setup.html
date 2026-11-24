@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>КТК на ЖД платформах — параметры</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --accent-hover: #0550ae;
+    --text: #1f2328;
+    --muted: #656d76;
+    --ok: #1a7f37;
+    --err: #cf222e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    line-height: 1.45;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .container { max-width: 1080px; width: 100%; }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .tile {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .tile.wide { grid-column: 1 / -1; }
+  .tile-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+  }
+  label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .field { position: relative; }
+  input[type="number"] {
+    width: 100%;
+    padding: 7px 30px 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    text-align: right;
+  }
+  input[type="number"]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .field .suffix {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .sum-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .sum-line .value { font-weight: 700; }
+  .sum-line .value.ok { color: var(--ok); }
+  .sum-line .value.err { color: var(--err); }
+  .hint { font-size: 11.5px; color: var(--muted); margin: 6px 0 0; }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .btn {
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    border: 1px solid transparent;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    margin: 0;
+  }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-primary:disabled { background: var(--muted); border-color: var(--muted); cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
+  .btn-secondary:hover { background: #f0f6ff; }
+  .error-box {
+    display: none;
+    background: #fff5f5;
+    border: 1px solid #f5c2c7;
+    color: var(--err);
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-top: 10px;
+  }
+  .error-box.visible { display: block; }
+  .field-disabled { opacity: 0.4; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>КТК на ЖД платформах — параметры партии</h1>
+  <div class="subtitle">Состав партии, нагрузка, смещение ЦТ и порожние.</div>
+
+  <div class="layout">
+    <!-- 1. Количество -->
+    <div class="tile">
+      <div class="tile-title">Количество</div>
+      <div class="row">
+        <div>
+          <label for="total">Всего КТК</label>
+          <div class="field">
+            <input type="number" id="total" value="10" min="1" step="1">
+            <span class="suffix">шт</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Общее число контейнеров в партии, включая порожние.</div>
+    </div>
+
+    <!-- 2. Загруженные по типам -->
+    <div class="tile">
+      <div class="tile-title">Состав</div>
+      <div class="row">
+        <div>
+          <label for="p20">20'</label>
+          <div class="field">
+            <input type="number" id="p20" value="50" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+        <div>
+          <label for="p30">30'</label>
+          <div class="field">
+            <input type="number" id="p30" value="0" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+        <div>
+          <label for="p40">40'</label>
+          <div class="field">
+            <input type="number" id="p40" value="50" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+      </div>
+      <div class="sum-line">
+        <span>Сумма загруженных:</span>
+        <span id="sumLoaded" class="value ok">100 %</span>
+      </div>
+      <div class="hint">Доля загруженных КТК по типам. Сумма = 100%.</div>
+    </div>
+
+    <!-- 3. Нагрузка по массе -->
+    <div class="tile">
+      <div class="tile-title">Нагрузка по массе</div>
+      <div class="row">
+        <div>
+          <label for="deviation">Отклонение от макс. массы</label>
+          <div class="field">
+            <input type="number" id="deviation" value="10" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Насколько КТК может быть недогружен (0% — полный).</div>
+    </div>
+
+    <!-- 4. Смещение ЦТ -->
+    <div class="tile">
+      <div class="tile-title">Смещение центра тяжести</div>
+      <div class="row">
+        <div>
+          <label for="cgShare">Доля КТК со смещением</label>
+          <div class="field">
+            <input type="number" id="cgShare" value="30" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+        <div id="cgMinWrap">
+          <label for="cgMin">Мин.</label>
+          <div class="field">
+            <input type="number" id="cgMin" value="0" min="0" step="1">
+            <span class="suffix">мм</span>
+          </div>
+        </div>
+        <div id="cgMaxWrap">
+          <label for="cgMax">Макс.</label>
+          <div class="field">
+            <input type="number" id="cgMax" value="500" min="0" step="1">
+            <span class="suffix">мм</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint">Диапазон смещения; при доле 0% — все без смещения.</div>
+    </div>
+
+    <!-- 5. Порожние, ПОСЛЕ смещения ЦТ -->
+    <div class="tile">
+      <div class="tile-title">Порожние — доля от общего числа</div>
+      <div class="row">
+        <div>
+          <label for="e20">20'</label>
+          <div class="field">
+            <input type="number" id="e20" value="0" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+        <div>
+          <label for="e30">30'</label>
+          <div class="field">
+            <input type="number" id="e30" value="0" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+        <div>
+          <label for="e40">40'</label>
+          <div class="field">
+            <input type="number" id="e40" value="0" min="0" max="100" step="1">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+      </div>
+      <div class="sum-line">
+        <span>Сумма порожних:</span>
+        <span id="sumEmpty" class="value ok">0 %</span>
+        <span style="color:var(--muted); font-size:12px;">(≤ 100%)</span>
+      </div>
+      <div class="sum-line">
+        <span id="emptyBreakdown">Порожних: 0 из 10 — остальные 10 загруженные</span>
+      </div>
+      <div class="hint">Порожние входят в «Всего КТК», а не добавляются сверху. Остаток — загруженные.</div>
+    </div>
+	
+	 <!-- 6. Предельная масса КТК (рядом с Порожними) -->
+    <div class="tile">
+      <div class="tile-title">Предельная масса брутто (69 т / n)</div>
+      <div class="row">
+        <div>
+          <label for="m20">20' (n = 4)</label>
+          <div class="field">
+            <input type="number" id="m20" value="17.25" min="0.1" step="0.01">
+            <span class="suffix">т</span>
+          </div>
+        </div>
+        <div>
+          <label for="m30">30' (n = 3)</label>
+          <div class="field">
+            <input type="number" id="m30" value="23" min="0.1" step="0.01">
+            <span class="suffix">т</span>
+          </div>
+        </div>
+        <div>
+          <label for="m40">40' (n = 2)</label>
+          <div class="field">
+            <input type="number" id="m40" value="34.5" min="0.1" step="0.01">
+            <span class="suffix">т</span>
+          </div>
+        </div>
+      </div>
+      <div class="hint">По умолчанию: г/п платформы 69 т делённая на n (4, 3 и 2 шт.).</div>
+    </div>
+
+    <!-- 6. Кнопки -->
+    <div class="tile wide">
+      <div id="errorBox" class="error-box"></div>
+      <div class="actions">
+        <button id="nextBtn" class="btn btn-primary">Далее →</button>
+        <button id="resetBtn" class="btn btn-secondary">Сбросить</button>
+        <a href="index.html" class="btn btn-secondary">← На главную</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+const totalEl = $("total");
+const p20 = $("p20"), p30 = $("p30"), p40 = $("p40");
+const e20 = $("e20"), e30 = $("e30"), e40 = $("e40");
+const deviation = $("deviation");
+const cgShare = $("cgShare"), cgMin = $("cgMin"), cgMax = $("cgMax");
+const cgMinWrap = $("cgMinWrap"), cgMaxWrap = $("cgMaxWrap");
+const sumLoaded = $("sumLoaded"), sumEmpty = $("sumEmpty");
+const emptyBreakdown = $("emptyBreakdown");
+const errorBox = $("errorBox"), nextBtn = $("nextBtn");
+
+const num = el => { const v = parseFloat(el.value); return isNaN(v) ? 0 : v; };
+const int = el => { const v = parseInt(el.value, 10); return isNaN(v) ? 0 : v; };
+
+function toggleCgFields() {
+  const dis = num(cgShare) <= 0;
+  cgMinWrap.classList.toggle("field-disabled", dis);
+  cgMaxWrap.classList.toggle("field-disabled", dis);
+}
+
+function updateState() {
+  const sl = num(p20) + num(p30) + num(p40);
+  const se = num(e20) + num(e30) + num(e40);
+
+  sumLoaded.textContent = Math.round(sl * 100) / 100 + " %";
+  sumLoaded.className = "value " + (Math.abs(sl - 100) < 0.01 ? "ok" : "err");
+
+  sumEmpty.textContent = Math.round(se * 100) / 100 + " %";
+  sumEmpty.className = "value " + (se <= 100.01 ? "ok" : "err");
+
+  // Разбивка порожних: сколько из общего числа
+  const N = int(totalEl);
+  const nE20 = Math.round(N * num(e20) / 100);
+  const nE30 = Math.round(N * num(e30) / 100);
+  const nE40 = Math.round(N * num(e40) / 100);
+  const nEmpty = nE20 + nE30 + nE40;
+  const nLoaded = Math.max(0, N - nEmpty);
+  emptyBreakdown.textContent = `Порожних: ${nEmpty} из ${N} — остальные ${nLoaded} загруженные`;
+
+  toggleCgFields();
+
+  const totalOk = N >= 1;
+  const loadedOk = Math.abs(sl - 100) < 0.01 && num(p20) >= 0 && num(p30) >= 0 && num(p40) >= 0;
+  const emptyOk = se <= 100.01 && num(e20) >= 0 && num(e30) >= 0 && num(e40) >= 0;
+  const devOk = num(deviation) >= 0 && num(deviation) <= 100;
+  const share = num(cgShare);
+  const shareOk = share >= 0 && share <= 100;
+  let cgOk = true;
+  if (share > 0) {
+    const mn = num(cgMin), mx = num(cgMax);
+    cgOk = mn >= 0 && mx >= mn;
+  }
+
+  const valid = totalOk && loadedOk && emptyOk && devOk && shareOk && cgOk;
+  nextBtn.disabled = !valid;
+  if (valid) errorBox.classList.remove("visible");
+  return valid;
+}
+
+[totalEl, p20, p30, p40, e20, e30, e40, deviation, cgShare, cgMin, cgMax]
+  .forEach(el => { el.addEventListener("input", updateState); el.addEventListener("change", updateState); });
+
+$("resetBtn").addEventListener("click", () => {
+  totalEl.value = 10;
+  p20.value = 50; p30.value = 0; p40.value = 50;
+  e20.value = 0; e30.value = 0; e40.value = 0;
+  deviation.value = 10;
+  cgShare.value = 30; cgMin.value = 0; cgMax.value = 500;
+  updateState();
+});
+
+nextBtn.addEventListener("click", () => {
+  if (!updateState()) {
+    errorBox.textContent = "Проверьте: всего ≥ 1; загруженные = 100%; порожние ≤ 100%; отклонение 0–100%; доля ЦТ 0–100%; мин ≤ макс.";
+    errorBox.classList.add("visible");
+    return;
+  }
+  const share = num(cgShare);
+  const params = new URLSearchParams({
+    total: int(totalEl),
+    p20: num(p20), p30: num(p30), p40: num(p40),
+    e20: num(e20), e30: num(e30), e40: num(e40),
+	m20: num(m20), m30: num(m30), m40: num(m40),
+    dev: num(deviation),
+    cgShare: share,
+    cgMin: share > 0 ? num(cgMin) : 0,
+    cgMax: share > 0 ? num(cgMax) : 0,
+  });
+  window.location.href = "krtk.html?" + params.toString();
+});
+
+updateState();
+</script>
+</body>
+</html>

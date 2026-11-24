@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>КТК на ЖД платформах — скоро</title>
+<title>КТК на ЖД платформах — состав</title>
 <style>
   :root {
     --bg: #f4f6f8;
@@ -13,6 +13,10 @@
     --accent-hover: #0550ae;
     --text: #1f2328;
     --muted: #656d76;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --err: #cf222e;
+    --row-alt: #fafbfc;
   }
   * { box-sizing: border-box; }
   body {
@@ -20,76 +24,360 @@
     background: var(--bg);
     color: var(--text);
     margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 24px;
     line-height: 1.5;
   }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 48px 40px;
-    max-width: 520px;
-    width: 100%;
-    text-align: center;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
-  }
-  .icon {
-    font-size: 64px;
-    line-height: 1;
+    border-radius: 8px;
+    padding: 20px;
     margin-bottom: 16px;
-    display: inline-block;
-    animation: float 3s ease-in-out infinite;
   }
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-  h1 {
-    font-size: 26px;
-    margin: 0 0 8px;
-  }
-  .subtitle {
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 15px;
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
     margin-bottom: 16px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
   }
-  p {
-    color: var(--muted);
-    margin: 0 0 28px;
-    font-size: 15px;
+  .stat { background: var(--bg); border-radius: 6px; padding: 12px; }
+  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
   }
   .btn {
-    display: inline-block;
-    background: var(--accent);
-    color: #fff;
-    text-decoration: none;
-    padding: 10px 22px;
+    padding: 9px 18px;
     border-radius: 6px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    border: 1px solid var(--accent);
-    transition: background 0.15s, border-color 0.15s;
+    cursor: pointer;
+    font-family: inherit;
+    border: 1px solid transparent;
+    text-decoration: none;
+    display: inline-block;
+    transition: background .15s, color .15s, border-color .15s;
+    margin: 0;
   }
-  .btn:hover {
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-secondary { background: #fff; color: var(--accent); border-color: var(--accent); }
+  .btn-secondary:hover { background: #f0f6ff; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
   }
+  th, td {
+    padding: 7px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th {
+    background: var(--bg);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+  }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tag-loaded { background: #e6f4ea; color: var(--ok); }
+  .tag-empty  { background: #fff4e5; color: var(--warn); }
+  .tag-cg     { background: #fde8e8; color: var(--err); }
+  .tag-cg0    { background: #eef1f4; color: var(--muted); }
+  .warn { color: var(--err); font-weight: 600; }
+  .scroll { max-height: 60vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="icon">🚃</div>
-    <div class="subtitle">В разработке</div>
-    <h1>КТК на ЖД платформах</h1>
-    <p>Скоро здесь появится калькулятор размещения крупнотоннажных контейнеров на железнодорожных платформах. Следите за обновлениями!</p>
-    <a href="index.html" class="btn">← На главную</a>
+<div class="container">
+  <h1>КТК на ЖД платформах — состав партии</h1>
+  <div class="subtitle">Этап 1: сгенерированный список контейнеров. Размещение — следующим шагом.</div>
+
+  <div id="paramsError" class="card" style="display:none;">
+    <p class="warn" id="paramsErrorText"></p>
+    <a href="krtk-setup.html" class="btn btn-secondary">← Изменить параметры</a>
   </div>
+
+  <div id="main" style="display:none;">
+    <div class="card">
+      <div class="summary" id="summary"></div>
+      <div class="toolbar">
+        <button id="regenBtn" class="btn btn-primary">🔄 Перегенерировать</button>
+		<button id="placeBtn" class="btn btn-primary" style="background: var(--ok); border-color: var(--ok);">Разместить на платформах →</button>
+        <a href="krtk-setup.html" class="btn btn-secondary">← Изменить параметры</a>
+      </div>
+      <div class="scroll">
+        <table id="listTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Тип</th>
+              <th>Состояние</th>
+              <th>Масса, т</th>
+              <th>Длина, м</th>
+              <th>Смещение ЦТ, мм</th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ===================== ПАРАМЕТРЫ ИЗ URL =====================
+const params = new URLSearchParams(window.location.search);
+
+function parseNum(key, def) {
+  const v = parseFloat(params.get(key));
+  return Number.isFinite(v) ? v : def;
+}
+function parseIntSafe(key, def) {
+  const v = parseInt(params.get(key), 10);
+  return Number.isFinite(v) ? v : def;
+}
+
+const P = {
+  total: parseIntSafe("total", 0),
+  p20: parseNum("p20", 0),
+  p30: parseNum("p30", 0),
+  p40: parseNum("p40", 0),
+  e20: parseNum("e20", 0),
+  e30: parseNum("e30", 0),
+  e40: parseNum("e40", 0),
+  m20: parseNum("m20", 69 / 4), // 17.25 т по умолчанию
+  m30: parseNum("m30", 69 / 3), // 23.00 т по умолчанию
+  m40: parseNum("m40", 69 / 2), // 34.50 т по умолчани
+  dev: parseNum("dev", 0),
+  cgShare: parseNum("cgShare", 0),
+  cgMin: parseNum("cgMin", 0),
+  cgMax: parseNum("cgMax", 0),
+};
+
+// ===================== СПРАВОЧНИК КТК =====================
+const KTK_SPECS = {
+  "20": { lengthM: 6.058, maxMassT: P.m20 },
+  "30": { lengthM: 9.125, maxMassT: P.m30 },
+  "40": { lengthM: 12.192, maxMassT: P.m40 },
+};
+
+
+// Валидация
+const validParams =
+  P.total >= 1 &&
+  Math.abs((P.p20 + P.p30 + P.p40) - 100) < 0.01 &&
+  (P.e20 + P.e30 + P.e40) <= 100.01 &&
+  P.dev >= 0 && P.dev <= 100 &&
+  P.cgShare >= 0 && P.cgShare <= 100 &&
+  P.cgMin >= 0 && P.cgMax >= P.cgMin;
+  
+let currentBatch = null;
+
+if (!validParams) {
+  document.getElementById("paramsError").style.display = "";
+  document.getElementById("paramsErrorText").textContent =
+    "Параметры не переданы или некорректны. Вернитесь и укажите их заново.";
+} else {
+  document.getElementById("main").style.display = "";
+  init();
+}
+
+// ===================== ГЕНЕРАЦИЯ =====================
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeSeed() {
+  const now = new Date();
+  return (now.getSeconds() * 1000 + now.getMilliseconds() + Math.floor(performance.now() * 1000)) >>> 0;
+}
+
+// Распределение количества по типам с корректировкой остатка
+function splitByPercent(totalCount, p20, p30) {
+  const n20 = Math.round(totalCount * p20 / 100);
+  const n30 = Math.round(totalCount * p30 / 100);
+  const n40 = totalCount - n20 - n30;
+  return { n20, n30, n40 };
+}
+
+/**
+ * Генерирует состав партии.
+ * Порожние входят в total. Загруженные = total − порожние.
+ */
+function generateBatch(P, seed) {
+  const rnd = mulberry32(seed);
+
+  // 1. Порожние — от общего числа
+  const emptySplit = splitByPercent(P.total, P.e20, P.e30);
+  // Пересчёт: e40 — остаток, чтобы сумма порожних была корректной
+  const nE20 = Math.round(P.total * P.e20 / 100);
+  const nE30 = Math.round(P.total * P.e30 / 100);
+  const nE40 = Math.round(P.total * P.e40 / 100);
+  const nEmpty = nE20 + nE30 + nE40;
+
+  // 2. Загруженные — остаток
+  const nLoaded = Math.max(0, P.total - nEmpty);
+  const loadedSplit = splitByPercent(nLoaded, P.p20, P.p30);
+  const nL20 = loadedSplit.n20;
+  const nL30 = loadedSplit.n30;
+  const nL40 = loadedSplit.n40;
+
+  // 3. Сколько КТК со смещением ЦТ
+  const nCg = Math.round(P.total * P.cgShare / 100);
+
+  // 4. Собираем список
+  const items = [];
+
+  function pushItems(type, count, isEmpty) {
+    for (let i = 0; i < count; i++) {
+      const spec = KTK_SPECS[type];
+      const mass = isEmpty ? 0 : spec.maxMassT * (1 - (P.dev / 100) * rnd());
+      // смещение ЦТ: ± в [cgMin, cgMax], если этот КТК попал в долю
+      const hasCg = (items.filter(x => x.cgMm !== 0).length < nCg) && (rnd() < 0.5 || P.cgShare >= 100);
+      let cgMm = 0;
+      if (hasCg) {
+        const mag = P.cgMin + rnd() * (P.cgMax - P.cgMin);
+        const sign = rnd() < 0.5 ? -1 : 1;
+        cgMm = Math.round(sign * mag);
+      }
+      items.push({
+        type,
+        isEmpty,
+        massT: Math.round(mass * 100) / 100,
+        lengthM: spec.lengthM,
+        cgMm,
+      });
+    }
+  }
+
+  pushItems("20", nL20, false);
+  pushItems("30", nL30, false);
+  pushItems("40", nL40, false);
+  pushItems("20", nE20, true);
+  pushItems("30", nE30, true);
+  pushItems("40", nE40, true);
+
+  // 5. Перемешиваем (но так, чтобы количество со смещением не сбилось — уже проставлено)
+  //    Просто тасуем порядок для наглядности.
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+
+  // 6. Перенумеровываем по порядку
+  items.forEach((it, idx) => { it.id = idx + 1; });
+
+  return {
+    items,
+    stats: {
+      total: P.total,
+      nL20, nL30, nL40, nLoaded,
+      nE20, nE30, nE40, nEmpty,
+      nCg,
+    },
+  };
+}
+
+// ===================== ВЫВОД =====================
+
+function renderSummary(stats) {
+  const totalMass = currentBatch.items.reduce((s, x) => s + x.massT, 0);
+  const loadedMass = currentBatch.items.filter(x => !x.isEmpty).reduce((s, x) => s + x.massT, 0);
+  const cards = [
+    { label: "Всего КТК", value: stats.total },
+    { label: "Загруженных", value: stats.nLoaded },
+    { label: "Порожних", value: stats.nEmpty },
+    { label: "Масса груза, т", value: loadedMass.toFixed(2) },
+    { label: "Со смещением ЦТ", value: stats.nCg },
+  ];
+  document.getElementById("summary").innerHTML = cards.map(c => `
+    <div class="stat">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+    </div>`).join("");
+}
+
+function renderTable(items) {
+  const tbody = document.getElementById("listBody");
+  tbody.innerHTML = items.map(it => {
+    const stateTag = it.isEmpty
+      ? '<span class="tag tag-empty">порожний</span>'
+      : '<span class="tag tag-loaded">загружен</span>';
+    const cgTag = it.cgMm === 0
+      ? '<span class="tag tag-cg0">0</span>'
+      : `<span class="tag tag-cg">${it.cgMm > 0 ? "+" : ""}${it.cgMm}</span>`;
+    return `<tr>
+      <td class="num">${it.id}</td>
+      <td>${it.type}'</td>
+      <td>${stateTag}</td>
+      <td class="num">${it.isEmpty ? "—" : it.massT.toFixed(2)}</td>
+      <td class="num">${it.lengthM.toFixed(3)}</td>
+      <td class="num">${cgTag}</td>
+    </tr>`;
+  }).join("");
+}
+
+function regenerate() {
+  const seed = makeSeed();
+  currentBatch = generateBatch(P, seed);
+  renderSummary(currentBatch.stats);
+  renderTable(currentBatch.items);
+  console.log("seed:", seed, "stats:", currentBatch.stats);
+}
+
+function init() {
+  regenerate();
+  document.getElementById("regenBtn").addEventListener("click", regenerate);
+  
+  document.getElementById("placeBtn").addEventListener("click", () => {
+  if (!currentBatch || !currentBatch.items.length) return;
+
+  // Сохраняем и список КТК, и исходные параметры партии (пригодятся для отчёта или проверки предельных масс)
+  const payload = {
+    params: P,
+    items: currentBatch.items,
+    stats: currentBatch.stats,
+  };
+  sessionStorage.setItem("ktk_batch", JSON.stringify(payload));
+
+  // Переходим на страницу размещения (замените имя файла на ваше)
+  window.location.href = "krtk-place.html";
+});
+
+}
+</script>
 </body>
 </html>
