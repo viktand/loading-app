@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Визуализация раскладки рулонов</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --text: #1f2328;
+    --muted: #656d76;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --err: #cf222e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .toolbar label { font-size: 13px; font-weight: 600; }
+  .toolbar input[type="range"] { vertical-align: middle; }
+  .toolbar input[type="number"] {
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    border: 1px solid var(--accent);
+    text-decoration: none;
+    display: inline-block;
+    transition: background .15s, color .15s, border-color .15s;
+    margin: 0;
+    background: #fff;
+    color: var(--accent);
+  }
+  .btn:hover { background: #f0f6ff; }
+  .btn.active { background: var(--accent); color: #fff; }
+  .btn-close { margin-left: auto; }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .stat .label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .stat .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .ktk-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color .15s;
+  }
+  .ktk-card:hover { border-color: var(--accent); }
+  .ktk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .ktk-header .num { font-weight: 700; font-size: 15px; }
+  .ktk-header .mass {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .ktk-header .mass.over { color: var(--err); font-weight: 700; }
+
+  .slots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0 24px;
+    min-height: 100px;
+  }
+ 
+  .slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: var(--slot-w, 90px);
+    height: var(--slot-w, 90px);
+    border-radius: 50%;
+    border: 2px dashed var(--border);
+    background: #fafbfc;
+    font-size: 11px;
+    color: var(--muted);
+    flex: 0 0 auto;
+  }
+  .slot.empty { opacity: .6; }
+
+  .roll-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    text-align: center;
+    border: 2px solid rgba(255,255,255,.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .roll-circle .m { font-size: 13px; }
+  .roll-circle .d { font-size: 10px; opacity: .85; font-weight: 500; }
+
+  .slot .pos-label {
+    position: absolute;
+    bottom: -18px;
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .ktk-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .bar {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .bar > div {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width .2s;
+  }
+  .bar > div.warn { background: var(--warn); }
+  .bar > div.ok { background: var(--ok); }
+
+  .empty-state {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .list-rolls {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .list-rolls h3 { margin: 0 0 8px; font-size: 15px; }
+  .list-rolls .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: #eef1f4;
+    color: var(--muted);
+  }
+  .rolls-stack {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .rolls-stack h3 { margin: 0 0 12px; font-size: 15px; }
+
+  .stack-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;               /* вертикальный зазор между рядами */
+  }
+  .stack-row {
+    display: flex;
+    gap: 6px;               /* горизонтальный зазор между кругами */
+    align-items: center;
+    flex-wrap: wrap;        /* если ряд длинный — переносим */
+  }
+  /* Сдвиг на пол места у чётных рядов (1-й, 3-й, ... — без сдвига; 2-й, 4-й — со сдвигом) */
+  .stack-row.offset {
+    margin-left: calc(var(--slot-size) / 2 + 3px);
+  }
+  .stack-row.center {
+    justify-content: center;
+  }
+  .stack-row .roll-mini {
+    width: var(--slot-size);
+    height: var(--slot-size);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    text-align: center;
+    border: 2px solid rgba(255,255,255,.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    flex: 0 0 auto;
+  }
+  .stack-row .roll-mini .m { font-size: 11px; }
+  .stack-row .roll-mini .d { font-size: 9px; opacity: .85; font-weight: 500; }
+  .hidden { display: none; }
+    .stack-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;                /* между пирамидами */
+    align-items: center;      /* пирамиды по центру */
+  }
+  .pyramid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;      /* ряды по центру друг под другом */
+    gap: 4px;                 /* вертикальный зазор между рядами */
+  }
+  .stack-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;        /* ряд не переносится */
+  }
+  .stack-row .roll-mini {
+    width: var(--slot-size);
+    height: var(--slot-size);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    text-align: center;
+    border: 2px solid rgba(255,255,255,.4);
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    flex: 0 0 auto;
+  }
+  .stack-row .roll-mini .m { font-size: 11px; }
+  .stack-row .roll-mini .d { font-size: 9px; opacity: .85; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div>
+      <h1>Визуализация раскладки рулонов</h1>
+      <div class="subtitle" id="subtitle">—</div>
+    </div>
+  </div>
+
+  <div id="noData" class="empty-state hidden">
+    <p>Нет данных для визуализации.</p>
+    <p>Вернитесь в калькулятор, выполните расчёт и нажмите «🖼 Визуализация».</p>
+  </div>
+
+  <div id="viewRoot" class="hidden">
+    <div class="toolbar">
+      <label for="scaleRange">Масштаб:</label>
+      <input type="range" id="scaleRange" min="60" max="160" value="90" step="10">
+      <span id="scaleValue">90 px</span>
+
+      <label style="margin-left:12px;" for="onlyPartial">
+        <input type="checkbox" id="onlyPartial"> Только с недогрузом
+      </label>
+
+      <label style="margin-left:12px;" for="filterPct">Недогруз &gt;</label>
+      <input type="number" id="filterPct" value="0" min="0" max="100" step="1">
+      <span>%</span>
+
+      <button class="btn btn-close" id="closeBtn">Закрыть</button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+    <div class="grid" id="grid"></div>
+
+    <div id="extras"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+// ===================== ДАННЫЕ =====================
+
+let DATA = null;
+let MAX_DIAMETER_MM = 2200; // будет пересчитано в init()
+
+try {
+  const raw = sessionStorage.getItem("rollsVizData");
+  if (raw) DATA = JSON.parse(raw);
+} catch (e) {
+  console.error("Ошибка чтения данных:", e);
+}
+
+// Проверка: есть ли данные и есть ли контейнеры
+const hasContainers = DATA && Array.isArray(DATA.containers) && DATA.containers.length > 0;
+const hasAnyData = DATA && (
+  hasContainers ||
+  (Array.isArray(DATA.unplaceable) && DATA.unplaceable.length > 0) ||
+  (Array.isArray(DATA.leftover) && DATA.leftover.length > 0)
+);
+
+if (!hasAnyData) {
+  $("noData").classList.remove("hidden");
+} else {
+  $("viewRoot").classList.remove("hidden");
+  init();
+}
+
+// ===================== ВСПОМОГАТЕЛЬНЫЕ =====================
+
+function getSlots(c) {
+  return c.slots || c.rolls || [];
+}
+
+function computeMaxDiameter() {
+  let max = 2200;
+  for (const c of (DATA.containers || [])) {
+    for (const r of getSlots(c)) {
+      if (r && r.outerDiameterMm > max) max = r.outerDiameterMm;
+    }
+  }
+  return max;
+}
+
+function massToColor(massTon, maxMassTon) {
+  const t = Math.max(0, Math.min(1, massTon / maxMassTon));
+  const r = Math.round(210 - 150 * t);
+  const g = Math.round(230 - 130 * t);
+  const b = Math.round(250 - 60 * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function diameterToPx(diamMm, slotSize) {
+  const ratio = Math.min(1, diamMm / MAX_DIAMETER_MM);
+  return Math.max(28, Math.round(slotSize * 0.42 + ratio * slotSize * 0.55));
+}
+
+// ===================== РЕНДЕР =====================
+
+function renderCard(c, slotSize) {
+  const slotsArr = getSlots(c);
+  const pct = (c.currentMass / c.maxMassTon) * 100;
+  const pctClass = pct >= 95 ? "ok" : pct >= 70 ? "" : "warn";
+
+  const slotsHtml = slotsArr.map((roll, idx) => {
+    const pos = idx + 1;
+    if (!roll) {
+      return `<div class="slot empty" style="width:${slotSize}px; height:${slotSize}px;">
+        <span style="font-size:11px;">пусто</span>
+        <span class="pos-label">поз. ${pos}</span>
+      </div>`;
+    }
+    const d = diameterToPx(roll.outerDiameterMm, slotSize);
+    const color = massToColor(roll.massTon, c.maxMassTon);
+    return `<div class="slot" style="border:none; background:none; width:${slotSize}px; height:${slotSize}px; display:flex; align-items:center; justify-content:center;">
+      <div class="roll-circle" style="width:${d}px; height:${d}px; background:${color};">
+        <div class="m">${roll.massTon.toFixed(2)}</div>
+        <div class="d">${roll.outerDiameterMm.toFixed(0)} мм</div>
+      </div>
+      <span class="pos-label">поз. ${pos}</span>
+    </div>`;
+  }).join("");
+
+
+  return `<div class="ktk-card">
+    <div class="ktk-header">
+      <span class="num">КТК#${String(c.number).padStart(3, "0")}</span>
+      <span class="mass ${c.currentMass > c.maxMassTon ? "over" : ""}">
+        ${c.currentMass.toFixed(2)} / ${c.maxMassTon.toFixed(1)} т
+      </span>
+    </div>
+    <div class="slots">${slotsHtml}</div>
+    <div class="bar"><div class="${pctClass}" style="width:${Math.min(100, pct)}%;"></div></div>
+    <div class="ktk-footer">
+      <span>Загрузка: ${pct.toFixed(0)}%</span>
+      <span>Свободно: ${c.remainingMass.toFixed(2)} т</span>
+    </div>
+  </div>`;
+}
+
+function renderSummary(containers) {
+  const totalMass = containers.reduce((s, c) => s + c.currentMass, 0);
+  const avg = containers.length ? totalMass / containers.length : 0;
+  const avgRem = containers.length
+    ? containers.reduce((s, c) => s + c.remainingMass, 0) / containers.length
+    : 0;
+  const cards = [
+    { label: "КТК", value: containers.length },
+    { label: "Средняя загрузка", value: avg.toFixed(2) + " т" },
+    { label: "Средний остаток", value: avgRem.toFixed(2) + " т" },
+    { label: "Всего груза", value: totalMass.toFixed(2) + " т" },
+  ];
+  $("summary").innerHTML = cards.map(c => `
+    <div class="stat"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>
+  `).join("");
+}
+
+function applyFilterAndRender() {
+  const slotSize = parseInt($("scaleRange").value, 10);
+  $("scaleValue").textContent = slotSize + " px";
+
+  const onlyPartial = $("onlyPartial").checked;
+  const minUnder = parseFloat($("filterPct").value) || 0;
+
+  let containers = DATA.containers || [];
+  if (onlyPartial || minUnder > 0) {
+    containers = containers.filter(c => {
+      const under = (c.remainingMass / c.maxMassTon) * 100;
+      return under > minUnder;
+    });
+  }
+
+  renderSummary(containers);
+
+  if (containers.length === 0) {
+    $("grid").innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Нет КТК, подходящих под фильтр.</div>`;
+  } else {
+    $("grid").innerHTML = containers.map(c => renderCard(c, slotSize)).join("");
+  }
+}
+
+function buildPyramids(rolls, availWidth) {
+  // Размеры кругов — крупные, но проверяем, чтобы основание влезло
+  const gap = 6;
+  let slotSize = 64;   // пробуем крупный
+
+  // Если при 64 px в основании < 8 кругов — пробуем мельче
+  let perRow = Math.floor((availWidth + gap) / (slotSize + gap));
+  if (perRow < 8) {
+    slotSize = 56;
+    perRow = Math.floor((availWidth + gap) / (slotSize + gap));
+  }
+  if (perRow < 8) {
+    slotSize = 48;
+    perRow = Math.floor((availWidth + gap) / (slotSize + gap));
+  }
+  perRow = Math.max(1, perRow);
+
+  const maxPerPyramid = (perRow * (perRow + 1)) / 2;
+  const pyramidsCount = Math.ceil(rolls.length / maxPerPyramid) || 1;
+
+  const pyramidsHtml = [];
+
+  for (let p = 0; p < pyramidsCount; p++) {
+    const start = p * maxPerPyramid;
+    const slice = rolls.slice(start, start + maxPerPyramid);
+    if (slice.length === 0) break;
+
+    const rows = [];
+    let idx = 0;
+    let rowLen = perRow;
+    while (idx < slice.length && rowLen > 0) {
+      const count = Math.min(rowLen, slice.length - idx);
+      rows.push(slice.slice(idx, idx + count));
+      idx += count;
+      rowLen -= 1;
+    }
+
+    const rowsTopDown = rows.slice().reverse();
+
+    const rowsHtml = rowsTopDown.map(row => {
+      const cells = row.map(r => {
+        const d = diameterToPx(r.outerDiameterMm, slotSize);
+        const color = massToColor(r.massTon, 24);
+        return `<div class="roll-mini" style="width:${d}px; height:${d}px; background:${color};" title="R${String(r.id).padStart(3,"0")} — ${r.massTon.toFixed(2)} т, D=${r.outerDiameterMm.toFixed(0)} мм">
+          <div class="m">${r.massTon.toFixed(2)}</div>
+          <div class="d">${r.outerDiameterMm.toFixed(0)}</div>
+        </div>`;
+      }).join("");
+      return `<div class="stack-row">${cells}</div>`;
+    }).join("");
+
+    pyramidsHtml.push(`<div class="pyramid">${rowsHtml}</div>`);
+  }
+
+  return pyramidsHtml.join("");
+}
+
+function renderExtras() {
+  const extras = $("extras");
+
+  const blocks = [];
+  if (DATA.unplaceable && DATA.unplaceable.length > 0) {
+    blocks.push({ title: "Неразместимые", rolls: DATA.unplaceable });
+  }
+  if (DATA.leftover && DATA.leftover.length > 0) {
+    blocks.push({ title: "Остаток партии", rolls: DATA.leftover });
+  }
+
+  // Проход 1: пустые блоки, чтобы измерить ширину
+  extras.innerHTML = blocks.map(b =>
+    `<div class="rolls-stack" data-title="${b.title}" data-count="${b.rolls.length}">
+      <h3>${b.title} (${b.rolls.length})</h3>
+      <div class="stack-rows"></div>
+    </div>`
+  ).join("");
+
+  // Проход 2: измеряем и заполняем
+  const stackEls = extras.querySelectorAll(".rolls-stack");
+  stackEls.forEach((el, i) => {
+    const block = blocks[i];
+    const rowsEl = el.querySelector(".stack-rows");
+    const availWidth = rowsEl.clientWidth || el.clientWidth || 800;   // fallback
+    rowsEl.innerHTML = buildPyramids(block.rolls, availWidth);
+  });
+}
+
+function computePerRow(slotSize, gap) {
+  // доступная ширина: окно минус отступы (24 px слева/справа + ~40 px на карточку)
+  const avail = Math.max(200, window.innerWidth - 24 * 2 - 40);
+  return Math.max(1, Math.floor((avail + gap) / (slotSize + gap)));
+}
+
+/**
+ * Рисует рулоны пирамидами: нижний ряд — полный (perRow),
+ * каждый следующий — на 1 меньше, со сдвигом на пол круга (в ложбинки).
+ * Если рулонов больше, чем в одну пирамиду, рисуем несколько пирамид.
+ */
+function renderRollsStack(title, rolls) {
+  const slotSize = 40;
+  const gap = 4;
+
+  // Доступная ширина: окно минус внешние отступы (24×2) и padding карточки (~32)
+  const avail = Math.max(200, window.innerWidth - 24 * 2 - 32);
+  const perRow = Math.max(1, Math.floor((avail + gap) / (slotSize + gap)));
+
+  const maxPerPyramid = (perRow * (perRow + 1)) / 2;
+  const pyramidsCount = Math.ceil(rolls.length / maxPerPyramid) || 1;
+
+  const pyramidsHtml = [];
+
+  for (let p = 0; p < pyramidsCount; p++) {
+    const start = p * maxPerPyramid;
+    const slice = rolls.slice(start, start + maxPerPyramid);
+    if (slice.length === 0) break;
+
+    // Строим ряды: нижний — perRow, выше — на 1 меньше
+    const rows = [];
+    let idx = 0;
+    let rowLen = perRow;
+    while (idx < slice.length && rowLen > 0) {
+      const count = Math.min(rowLen, slice.length - idx);
+      rows.push(slice.slice(idx, idx + count));
+      idx += count;
+      rowLen -= 1;
+    }
+
+    const rowsTopDown = rows.slice().reverse();
+
+    const rowsHtml = rowsTopDown.map(row => {
+      const cells = row.map(r => {
+        const d = diameterToPx(r.outerDiameterMm, slotSize);
+        const color = massToColor(r.massTon, 24);
+        return `<div class="roll-mini" style="width:${d}px; height:${d}px; background:${color};" title="R${String(r.id).padStart(3,"0")} — ${r.massTon.toFixed(2)} т, D=${r.outerDiameterMm.toFixed(0)} мм">
+          <div class="m">${r.massTon.toFixed(2)}</div>
+          <div class="d">${r.outerDiameterMm.toFixed(0)}</div>
+        </div>`;
+      }).join("");
+
+      return `<div class="stack-row">${cells}</div>`;
+    }).join("");
+
+    pyramidsHtml.push(`<div class="pyramid">${rowsHtml}</div>`);
+  }
+
+  return `<div class="rolls-stack">
+    <h3>${title} (${rolls.length})</h3>
+    <div class="stack-rows">${pyramidsHtml.join("")}</div>
+  </div>`;
+}
+
+function init() {
+  MAX_DIAMETER_MM = computeMaxDiameter();
+  const slotsCount = DATA.slotsCount || (DATA.containers[0] ? getSlots(DATA.containers[0]).length : 0);
+  const maxMass = DATA.maxMass || (DATA.containers[0] ? DATA.containers[0].maxMassTon : 0);
+  const patternName = DATA.patternName || "—";
+
+  $("subtitle").textContent =
+    `${slotsCount}-местный КТК · лимит ${maxMass.toFixed(1)} т · схема: ${patternName}`;
+
+  renderExtras();
+  applyFilterAndRender();
+
+  $("scaleRange").addEventListener("input", applyFilterAndRender);
+  $("onlyPartial").addEventListener("change", applyFilterAndRender);
+  $("filterPct").addEventListener("input", applyFilterAndRender);
+  $("closeBtn").addEventListener("click", () => window.close());
+}
+</script>
+</body>
+</html>

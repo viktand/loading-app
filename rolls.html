@@ -220,6 +220,7 @@
       <button id="runBtn" class="btn btn-primary">Рассчитать</button>
 	  <button href="index.html" class="btn btn-primary">← На главную</button>
       <button id="helpBtn" class="btn btn-secondary">📖 Описание алгоритма</button>
+	  <button id="vizBtn" class="btn btn-secondary">🖼 Визуализация</button>
     </div>
   </div>
 
@@ -644,6 +645,38 @@ $("runBtn").addEventListener("click", () => {
       const solver = new LoadingSolver(slotSpecs, maxMassPerContainer, maxContainers, pattern);
       const t0 = performance.now();
       const result = solver.solve(rolls);
+
+	// ===== Сохранение для визуализации =====
+	const vizData = {
+	  slotsCount,
+	  maxMass: maxMassPerContainer,
+	  slotSpecs: slotSpecs.map(s => ({
+		position: s.position,
+		maxMassTon: s.maxMassTon,
+		maxDiameterMm: s.maxDiameterMm,
+	  })),
+	  patternName: pattern.name,
+	  containers: result.containers.map(c => ({
+		number: c.number,
+		maxMassTon: c.maxMassTon,
+		currentMass: c.currentMass,
+		remainingMass: c.remainingMass,
+		slots: c.rolls.map(r => r === null ? null : {
+		  id: r.id,
+		  massTon: r.massTon,
+		  outerDiameterMm: r.outerDiameterMm,
+		}),
+	  })),
+	  unplaceable: result.unplaceable.map(r => ({
+		id: r.id, massTon: r.massTon, outerDiameterMm: r.outerDiameterMm,
+	  })),
+	  leftover: result.leftover.map(r => ({
+		id: r.id, massTon: r.massTon, outerDiameterMm: r.outerDiameterMm,
+	  })),
+	};
+	sessionStorage.setItem("rollsVizData", JSON.stringify(vizData));
+	// ===== конец =====
+	  
       const elapsed = (performance.now() - t0).toFixed(0);
 
       $("summary").innerHTML = buildSummary(result);
@@ -685,6 +718,14 @@ helpModal.addEventListener("click", (e) => {
 // Закрытие по Esc
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !helpModal.classList.contains("hidden")) closeHelp();
+});
+
+$("vizBtn").addEventListener("click", () => {
+  if (!sessionStorage.getItem("rollsVizData")) {
+    alert("Сначала выполните расчёт (кнопка «Рассчитать»).");
+    return;
+  }
+  window.open("rolls-view.html", "_blank");
 });
 </script>
 </body>
