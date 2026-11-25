@@ -615,7 +615,7 @@ $("runBtn").addEventListener("click", () => {
       const maxContainers = parseInt($("maxContainers").value, 10);
 
       if (!(n > 0)) throw new Error("Количество рулонов должно быть > 0");
-      if (!(minW >= 0) || !(maxW > minW)) throw new Error("Проверьте мин/макс вес");
+      if (!(minW >= 0) || !(maxW >= minW)) throw new Error("Проверьте мин/макс вес");
       if (maxContainers < 1) throw new Error("Макс. КТК должно быть ≥ 1");
 
       let maxMassPerContainer, slotSpecs, pattern;
@@ -726,6 +726,33 @@ $("vizBtn").addEventListener("click", () => {
     return;
   }
   window.open("rolls-view.html", "_blank");
+});
+</script>
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const count = params.get('count');
+  const minW = params.get('minWeight');
+  const maxW = params.get('maxWeight');
+
+  if (count && minW && maxW) {
+    // Находим числовые поля формы по порядку или по ID (если у вас заданы ID, можно указать их напрямую)
+    const inputs = document.querySelectorAll('input[type="number"]');
+    if (inputs.length >= 3) {
+      inputs[0].value = count; // Количество рулонов
+      inputs[1].value = minW;  // Мин. вес рулона, т
+      inputs[2].value = maxW;  // Макс. вес рулона, т
+    }
+
+    // Находим и нажимаем кнопку "Рассчитать"
+    const calcBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent.trim().includes('Рассчитать')
+    );
+    if (calcBtn) {
+      calcBtn.click();
+    }
+  }
 });
 </script>
 </body>
