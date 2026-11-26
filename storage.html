@@ -35,13 +35,49 @@
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eaeef2; }
   th { background: #f6f8fa; font-weight: 600; color: #57606a; }
+    .btn-info {
+    background: #fff; color: #0969da; border: 1px solid #0969da; border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-info:hover { background: #f0f6fc; }
+
+  /* Модальное окно справки */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(31, 35, 40, 0.55);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    background: #fff; border: 1px solid #d0d7de; border-radius: 12px;
+    max-width: 680px; width: 100%; max-height: 85vh; overflow-y: auto;
+    padding: 24px 28px; box-shadow: 0 12px 32px rgba(31, 35, 40, 0.2);
+  }
+  .modal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 12px; border-bottom: 1px solid #eaeef2; margin-bottom: 16px;
+  }
+  .modal-head h2 { margin: 0; font-size: 19px; color: #1f2328; }
+  .modal-close {
+    background: none; border: none; font-size: 22px; line-height: 1;
+    color: #656d76; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .modal-close:hover { background: #f6f8fa; color: #1f2328; }
+  .algo-text h3 { font-size: 15px; margin: 16px 0 6px; color: #0969da; }
+  .algo-text h3:first-child { margin-top: 0; }
+  .algo-text p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: #24292f; }
+  .algo-text ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.55; color: #24292f; }
+  .algo-text li { margin-bottom: 4px; }
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top-actions">
     <a class="back" href="index.html">← На главную</a>
-    <button class="btn-secondary" id="topResetBtn" style="padding:6px 12px; font-size:13px; color:#cf222e;">🗑️ Сбросить все площадки</button>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn-info" id="openAlgoBtn">ℹ️ Как работает алгоритм</button>
+      <button class="btn-secondary" id="topResetBtn" style="padding:6px 12px; font-size:13px; color:#cf222e;">🗑️ Сбросить все площадки</button>
+    </div>
   </div>
 
   <h1 id="pageTitle">Карта размещения рулонов</h1>
@@ -103,7 +139,44 @@
   </div>
 </div>
 
-<script src="js/storage-core.js?v=6"></script>
-<script src="js/storage-view.js?v=6"></script>
+  <!-- Модальное окно с описанием алгоритма -->
+  <div class="modal-backdrop" id="algoModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Как устроена площадка и алгоритм размещения</h2>
+        <button type="button" class="modal-close" id="closeAlgoBtn" title="Закрыть">×</button>
+      </div>
+      <div class="algo-text">
+        <h3>1. Топология площадки хранения</h3>
+        <p>Каждая складская площадка разделена на стандартные прямоугольные слоты размером <strong>20 × 3,6 метра</strong>. Внутри одного ряда слоты стыкуются торцами вплотную друг к другу (формируя длинную линию), а между соседними рядами оставлен технологический <strong>промежуток шириной 1 метр</strong> — он необходим для обеспечения свободного прохода персонала и безопасного доступа к любому месту хранения.</p>
+
+        <h3>2. Схема укладки грузов и выбор ярусности</h3>
+        <p>Для каждой партии можно выбрать штабелирование <strong>в 2 яруса</strong> (для максимальной экономии площади) или размещение строго <strong>в 1 ярус</strong> на полу (например, при ограничениях по нагрузке на основание или особенностях груза):</p>
+        <ul>
+          <li><strong>Рулоны 8 т</strong> (Ø 1400 × 1250 мм): лежат на боку в 2 параллельных ряда по ширине слота — до <strong>28 шт.</strong> в 1 ярус или до <strong>54 шт.</strong> в 2 яруса (верхний ярус ложится в «ложбинку» между нижними).</li>
+          <li><strong>Рулоны 15 т</strong> (Ø 1800 × 1500 мм): лежат на боку в 2 ряда — до <strong>22 шт.</strong> в 1 ярус или до <strong>42 шт.</strong> в 2 яруса.</li>
+          <li><strong>Биг-бэги 1 т</strong> (1000 × 1000 × 1200 мм): устанавливаются вертикально в 3 ряда по ширине слота — до <strong>60 шт.</strong> в 1 ярус или до <strong>120 шт.</strong> в 2 яруса.</li>
+        </ul>
+        <p>При двухъярусном размещении укладка идёт по принципу <strong>«сначала формируется полная высота по ширине ряда, затем переход дальше по длине»</strong> (для рулонов — «два снизу, один сверху, потом снова снизу и сверху»). Это не даёт нижнему ярусу занять всю длину слота раньше времени и оставляет гарантированное свободное место для стыковки, если слот заполнен не полностью.</p>
+
+        <h3>3. Универсальность для других генеральных грузов</h3>
+        <p>Помимо рулонов стали и биг-бэгов, заложенный алгоритм позволяет размещать в тех же слотах <strong>любые другие генеральные грузы</strong> (пачки листового проката, слябы, трубы, ящики и т. д.). Общий принцип поиска места, сохранения целостности партии и встречной стыковки остаётся неизменным — уточняются лишь габариты грузового места и технологическая схема его укладки внутри слота.</p>
+
+        <h3>4. Маршрут «змейкой» и запрет разрыва партий</h3>
+        <p>Чтобы партия груза не оказалась разорванной на два отдельных куска, слоты заполняются <strong>«змейкой»</strong>: первый ряд идёт слева направо, следующий — справа налево, затем снова слева направо. Партия всегда размещается единым непрерывным блоком. Если на выбранной площадке нет непрерывного участка нужной длины, алгоритм автоматически ищет подходящее место на соседней площадке.</p>
+
+        <h3>5. Встречная стыковка «хвостов» в одном слоте</h3>
+        <p>Если предыдущая партия заняла последний слот лишь частично, новая партия может зайти в этот же слот <strong>навстречу</strong> с противоположного торца, чтобы их «хвосты» сошлись в одном слоте и не терять пустое место. При этом алгоритм следит, чтобы между двумя партиями оставался обязательный <strong>защитный зазор не меньше двух единиц груза</strong> — это исключает случайное смешивание и упрощает отгрузку.</p>
+
+        <h3>6. Отгрузка в КТК</h3>
+        <p>При отправке партии в калькулятор контейнеров занимаемые ею места на площадке сразу освобождаются (если в слоте лежала вторая встречная партия, она остаётся нетронутой). Освободившиеся окна автоматически используются при размещении следующих партий.</p>
+      </div>
+    </div>
+  </div>
+
+
+<script src="js/storage-core.js?v=13"></script>
+<script src="js/storage-render.js?v=13"></script>
+<script src="js/storage-view.js?v=13"></script>
 </body>
 </html>

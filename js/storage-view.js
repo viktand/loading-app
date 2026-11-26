@@ -1,4 +1,16 @@
 let isRelocatedNotice = false;
+let isSharedNotice = false;
+
+function getCargoTitle(weight) {
+  if (typeof ROLL_SPECS !== 'undefined' && ROLL_SPECS[weight] && ROLL_SPECS[weight].label) {
+    return ROLL_SPECS[weight].label;
+  }
+  if (weight === 1) return 'Биг-бэг 1 т';
+  if (weight === 8) return 'Рулон 8 т';
+  if (weight === 15) return 'Рулон 15 т';
+  return `Груз ${weight} т`;
+}
+
 
 function initView() {
   if (window.__viewAlreadyInit) return;
@@ -7,6 +19,7 @@ function initView() {
   const urlParams = new URLSearchParams(window.location.search);
   const reqZoneId = parseInt(urlParams.get('zoneId'), 10);
   isRelocatedNotice = urlParams.get('relocated') === '1';
+  isSharedNotice = urlParams.get('shared') === '1';
 
   if (window.location.search) {
     window.history.replaceState({}, document.title, 'storage.html');
@@ -24,6 +37,17 @@ function initView() {
       window.location.href = 'storage-setup.html';
     }
   };
+  
+    const algoModal = document.getElementById('algoModal');
+	  document.getElementById('openAlgoBtn').addEventListener('click', () => {
+		algoModal.classList.add('open');
+	  });
+	  document.getElementById('closeAlgoBtn').addEventListener('click', () => {
+		algoModal.classList.remove('open');
+	  });
+	  algoModal.addEventListener('click', e => {
+		if (e.target === algoModal) algoModal.classList.remove('open');
+	  });
 
   document.getElementById('topResetBtn').addEventListener('click', resetHandler);
   document.getElementById('bottomResetBtn').addEventListener('click', resetHandler);
@@ -46,20 +70,18 @@ function renderViewPage(state) {
 
   const alertBox = document.getElementById('alertBox');
   alertBox.style.display = 'block';
-  if (lastBatch) {
+    if (lastBatch) {
+    const cargoName = getCargoTitle(lastBatch.weight);
+    const sharedText = isSharedNotice ? ' (хвост состыкован навстречу в общем слоте с зазором ≥ 2 единиц)' : '';
     if (isRelocatedNotice) {
       alertBox.className = 'alert warn';
-      alertBox.textContent = `На исходной площадке не хватило места без разрыва — Партия №${lastBatch.id} (${lastBatch.placed} шт. по ${lastBatch.weight} т) автоматически размещена на «${zone.name}».`;
+      alertBox.textContent = `На исходной площадке не хватило места — Партия №${lastBatch.id} (${cargoName}, ${lastBatch.placed} шт.) размещена на «${zone.name}»${sharedText}.`;
     } else {
       alertBox.className = 'alert ok';
-      alertBox.textContent = `Активная площадка: «${zone.name}». Последняя размещенная партия здесь — №${lastBatch.id} (${lastBatch.placed} шт. по ${lastBatch.weight} т).`;
+      alertBox.textContent = `Активная площадка: «${zone.name}». Последняя партия здесь — №${lastBatch.id} (${cargoName}, ${lastBatch.placed} шт.)${sharedText}.`;
     }
-  } else {
-    alertBox.className = 'alert ok';
-    alertBox.textContent = `«${zone.name}» сейчас свободна. Нажмите «+ Добавить еще партию», чтобы разместить груз.`;
   }
 
-  // Статистика по текущей отображаемой площадке
   let zoneRolls = 0;
   let zoneMass = 0;
   let occupiedSlots = 0;
@@ -80,7 +102,6 @@ function renderViewPage(state) {
   document.getElementById('statTotalMass').textContent = `${zoneMass.toLocaleString('ru-RU')} т`;
   document.getElementById('statFill').textContent = `${fillPercent}% (${occupiedSlots}/${zone.slots.length})`;
 
-  // Таблица партий площадки
   const tbody = document.getElementById('batchTable');
   tbody.innerHTML = '';
 
@@ -89,12 +110,13 @@ function renderViewPage(state) {
     emptyTr.innerHTML = `<td colspan="7" style="text-align:center; color:#656d76; padding:18px;">На этой площадке нет размещенных партий</td>`;
     tbody.appendChild(emptyTr);
   } else {
-    zoneBatches.forEach(b => {
+        zoneBatches.forEach(b => {
+      const cargoName = getCargoTitle(b.weight);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><span class="swatch" style="background:${b.color}; vertical-align:middle; margin-right:6px;"></span><strong>Партия №${b.id}</strong></td>
         <td><strong>${b.zoneName}</strong></td>
-        <td>${b.weight} т</td>
+        <td><strong>${cargoName}</strong></td>
         <td><strong>${b.placed} шт.</strong></td>
         <td>${(b.placed * b.weight).toLocaleString('ru-RU')} т</td>
         <td style="font-size:13px; color:#57606a;">${b.slotsList.join(', ') || '—'}</td>
@@ -118,29 +140,29 @@ function renderViewPage(state) {
         shipBatchFromStorage(state, id);
         saveStorageState(state);
 
-        const deltaMin = +(Math.random() * 0.9 + 0.1).toFixed(1); // от 0.1 до 1.0 т
-		const deltaMax = +(Math.random() * 0.9 + 0.1).toFixed(1); // от 0.1 до 1.0 т
+        const deltaMin = +(Math.random() * 0.9 + 0.1).toFixed(1);
+        const deltaMax = +(Math.random() * 0.9 + 0.1).toFixed(1);
+        const minW = Math.max(0.5, +(batch.weight - deltaMin).toFixed(1));
+        const maxW = +(batch.weight + deltaMax).toFixed(1);
 
-		const minW = Math.max(0.5, +(batch.weight - deltaMin).toFixed(1));
-		const maxW = +(batch.weight + deltaMax).toFixed(1);
-
-		const params = new URLSearchParams({
-		  count: batch.placed,
-		  minWeight: minW,
-		  maxWeight: maxW,
-		  fromBatch: batch.id
-		});
+        const params = new URLSearchParams({
+          count: batch.placed,
+          minWeight: minW,
+          maxWeight: maxW,
+          fromBatch: batch.id
+        });
         window.location.href = `rolls.html?${params.toString()}`;
       }
     });
   });
 
-  // Легенда партий текущей площадки
+  // В легенде под изометрией:
   const legend = document.getElementById('legend');
-  legend.innerHTML = `<span class="legend-item"><i class="swatch" style="background:#ffffff; border:1px solid #8c959f;"></i> Свободный слот</span>`;
-  zoneBatches.forEach(b => {
-    legend.innerHTML += `<span class="legend-item"><i class="swatch" style="background:${b.color};"></i> Партия №${b.id} (${b.weight} т, ${b.placed} шт.)</span>`;
-  });
+	  legend.innerHTML = `<span class="legend-item"><i class="swatch" style="background:#ffffff; border:1px solid #8c959f;"></i> Свободный слот</span>`;
+	  zoneBatches.forEach(b => {
+		const cargoName = getCargoTitle(b.weight);
+		legend.innerHTML += `<span class="legend-item"><i class="swatch" style="background:${b.color};"></i> Партия №${b.id}: <strong>${cargoName}</strong> (${b.placed} шт.)</span>`;
+	  });
 
   renderZoneCanvas('storageCanvas', zone, { compact: false });
 }

@@ -71,6 +71,7 @@
     text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
   }
   .btn-view:hover { background: #f0f6fc; }
+  .radio-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 </style>
 </head>
 <body>
@@ -122,38 +123,54 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>2. Типоразмер рулона новой партии</h2>
-      <div class="radio-cards">
-        <label class="radio-card active" id="opt8" data-weight="8">
-          <input type="radio" name="rollWeight" value="8" checked>
-          <div class="title">Рулон 8 тонн</div>
-          <div class="desc">Ø 1400 × 1250 мм (до 54 шт./слот в 2 яруса)</div>
-        </label>
-        <label class="radio-card" id="opt15" data-weight="15">
-          <input type="radio" name="rollWeight" value="15">
-          <div class="title">Рулон 15 тонн</div>
-          <div class="desc">Ø 1800 × 1500 мм (до 42 шт./слот в 2 яруса)</div>
-        </label>
-      </div>
-    </div>
+   <div class="card">
+	  <h2>2. Тип и размер груза новой партии</h2>
+	  <div class="radio-cards">
+		<label class="radio-card active" id="opt8" data-weight="8">
+		  <input type="radio" name="rollWeight" value="8" checked>
+		  <div class="title">Рулон 8 тонн</div>
+		  <div class="desc">Ø 1400 × 1250 мм (до 54 шт./слот, 2 яруса)</div>
+		</label>
+		<label class="radio-card" id="opt15" data-weight="15">
+		  <input type="radio" name="rollWeight" value="15">
+		  <div class="title">Рулон 15 тонн</div>
+		  <div class="desc">Ø 1800 × 1500 мм (до 42 шт./слот, 2 яруса)</div>
+		</label>
+		<label class="radio-card" id="opt1" data-weight="1">
+		  <input type="radio" name="rollWeight" value="1">
+		  <div class="title">Биг-бэг 1 тонна</div>
+		  <div class="desc">1000 × 1000 × 1200 мм (до 120 шт./слот, 3×2)</div>
+		</label>
+	  </div>
+	</div>
 
     <div class="card">
-      <h2>3. Параметры новой партии</h2>
-      <div class="row-2">
-        <div class="field">
-          <label for="batchNumber">Номер партии</label>
-          <input type="number" id="batchNumber" value="1" min="1" max="999999" required>
-          <div class="hint">Автоматически +1 от максимального номера</div>
-        </div>
-        <div class="field">
-          <label for="batchCount">Количество рулонов (шт.)</label>
-          <input type="number" id="batchCount" value="35" min="1" max="5000" required>
-          <div class="hint" id="batchMassHint">Масса новой партии: 280 т</div>
-        </div>
-      </div>
-      <div class="cap-alert ok" id="capacityAlert"></div>
-    </div>
+	  <h2>3. Параметры новой партии</h2>
+	  <div class="row-2">
+		<div class="field">
+		  <label for="batchNumber">Номер партии</label>
+		  <input type="number" id="batchNumber" value="1" min="1" max="999999" required>
+		  <div class="hint">Автоматически +1 от максимального номера</div>
+		</div>
+		<div class="field">
+		  <label for="batchCount">Количество грузовых мест (шт.)</label>
+		  <input type="number" id="batchCount" value="35" min="1" max="5000" required>
+		  <div class="hint" id="batchMassHint">Масса новой партии: 280 т</div>
+		</div>
+	  </div>
+
+	  <!-- переключатель ярусности -->
+	  <div class="field" style="margin-top: 14px;">
+		<label for="tiersMode">Ярусность штабелирования</label>
+		<select id="tiersMode" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #d0d7de; border-radius:6px; font-size:15px; background:#fff;">
+		  <option value="2" selected>В 2 яруса (стандартное штабелирование)</option>
+		  <option value="1">В 1 ярус (только на полу, без верхнего яруса)</option>
+		</select>
+	  </div>
+
+	  <div class="cap-alert ok" id="capacityAlert"></div>
+	</div>
+
 
     <div class="btn-group">
       <button type="submit" class="btn-submit" id="submitBtn">Разместить партию на площадке →</button>
@@ -162,7 +179,8 @@
   </form>
 </div>
 
-<script src="js/storage-core.js?v=6"></script>
-<script src="js/storage-setup.js?v=6"></script>
+<script src="js/storage-core.js?v=13"></script>
+<script src="js/storage-render.js?v=13"></script>
+<script src="js/storage-setup.js?v=13"></script>
 </body>
 </html>
