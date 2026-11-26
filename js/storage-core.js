@@ -84,20 +84,17 @@ function getZoneFreeSlotsCount(zone) {
   return zone.slots.filter(s => !s.coils || s.coils.length === 0).length;
 }
 
-// Маршрут слотов вертикальной «змейкой» (сверху вниз по колонкам):
-// Чётные колонки (c = 0, 2, 4...): сверху вниз (r = 0 -> slotsY - 1), вход слева
-// Нечётные колонки (c = 1, 3...): снизу вверх (r = slotsY - 1 -> 0), вход справа
+// Маршрут слотов вертикальной «змейкой» (сверху вниз по колонкам)
 function getSnakeRoute(zone) {
   const route = [];
   for (let c = 0; c < zone.slotsX; c++) {
-    const isEvenCol = (c % 2 === 0);
-    if (isEvenCol) {
+    if (c % 2 === 0) {
       for (let r = 0; r < zone.slotsY; r++) {
-        route.push({ slotIdx: r * zone.slotsX + c, entrySide: 'left', exitSide: 'right' });
+        route.push(r * zone.slotsX + c);
       }
     } else {
       for (let r = zone.slotsY - 1; r >= 0; r--) {
-        route.push({ slotIdx: r * zone.slotsX + c, entrySide: 'right', exitSide: 'left' });
+        route.push(r * zone.slotsX + c);
       }
     }
   }
@@ -190,63 +187,69 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
   const sharedCandidates = [];
   const pureEmptyCandidates = [];
 
-  // 1. Прямой ход по вертикальной змейке
+  // 1. Размещение в полностью пустые слоты подряд (все слоты заполняются слева направо: side = 'left')
   for (let s = 0; s <= N - totalSlotsNeeded; s++) {
     let ok = true;
     const steps = [];
 
     for (let k = 0; k < fullSlotsNeeded; k++) {
-      const node = route[s + k];
-      const b = getSlotOccupiedBounds(zone.slots[node.slotIdx]);
+      const slotIdx = route[s + k];
+      const b = getSlotOccupiedBounds(zone.slots[slotIdx]);
       if (!b.isEmpty) { ok = false; break; }
-      steps.push({ slotIdx: node.slotIdx, side: node.entrySide, count: spec.capacity });
+      steps.push({ slotIdx, side: 'left', count: spec.capacity });
     }
     if (!ok) continue;
 
     if (tailCount > 0) {
-      const tailNode = route[s + fullSlotsNeeded];
-      const b = getSlotOccupiedBounds(zone.slots[tailNode.slotIdx]);
-      const side = tailNode.entrySide;
-
+      const tailSlotIdx = route[s + fullSlotsNeeded];
+      const b = getSlotOccupiedBounds(zone.slots[tailSlotIdx]);
       if (b.isEmpty) {
-        steps.push({ slotIdx: tailNode.slotIdx, side, count: tailCount });
+        steps.push({ slotIdx: tailSlotIdx, side: 'left', count: tailCount });
         pureEmptyCandidates.push({ steps, shared: false });
-      } else if (side === 'left' && !b.hasLeft && b.hasRight && (tailLen + minGap + b.rightLen <= 20.001)) {
-        steps.push({ slotIdx: tailNode.slotIdx, side: 'left', count: tailCount });
-        sharedCandidates.push({ steps, shared: true });
-      } else if (side === 'right' && !b.hasRight && b.hasLeft && (b.leftLen + minGap + tailLen <= 20.001)) {
-        steps.push({ slotIdx: tailNode.slotIdx, side: 'right', count: tailCount });
-        sharedCandidates.push({ steps, shared: true });
       }
     } else {
       pureEmptyCandidates.push({ steps, shared: false });
     }
   }
 
-  // 2. Встречный ход по вертикальной змейке (для стыковки хвостов в общем слоте)
+  // 2. Встречная стыковка хвостом в уже частично занятый слот (справа налево: side = 'right')
   if (tailCount > 0) {
-    for (let s = totalSlotsNeeded - 1; s < N; s++) {
-      let ok = true;
-      const steps = [];
+    for (let s = 0; s < N; s++) {
+      const tailSlotIdx = route[s];
+      const b = getSlotOccupiedBounds(zone.slots[tailSlotIdx]);
 
-      for (let k = 0; k < fullSlotsNeeded; k++) {
-        const node = route[s - k];
-        const b = getSlotOccupiedBounds(zone.slots[node.slotIdx]);
-        if (!b.isEmpty) { ok = false; break; }
-        steps.push({ slotIdx: node.slotIdx, side: node.exitSide, count: spec.capacity });
+      // Слот должен быть занят слева (первым хвостом) и свободен справа с достаточным зазором
+      if (!b.hasLeft || b.hasRight) continue;
+      if (b.leftLen + minGap + tailLen > 20.001) continue;
+
+      // Проверяем, можно ли разместить остальные полные слоты партии подряд перед s (или после s)
+      // Вариант А: полные слоты идут перед s (s - fullSlotsNeeded ... s - 1)
+      if (s - fullSlotsNeeded >= 0) {
+        let okBefore = true;
+        const stepsBefore = [];
+        for (let k = fullSlotsNeeded; k >= 1; k--) {
+          const slotIdx = route[s - k];
+          if (!getSlotOccupiedBounds(zone.slots[slotIdx]).isEmpty) { okBefore = false; break; }
+          stepsBefore.push({ slotIdx, side: 'left', count: spec.capacity });
+        }
+        if (okBefore) {
+          stepsBefore.push({ slotIdx: tailSlotIdx, side: 'right', count: tailCount });
+          sharedCandidates.push({ steps: stepsBefore, shared: true });
+        }
       }
-      if (!ok) continue;
 
-      const tailNode = route[s - fullSlotsNeeded];
-      const b = getSlotOccupiedBounds(zone.slots[tailNode.slotIdx]);
-      const side = tailNode.exitSide;
-
-      if (side === 'left' && !b.hasLeft && b.hasRight && (tailLen + minGap + b.rightLen <= 20.001)) {
-        steps.push({ slotIdx: tailNode.slotIdx, side: 'left', count: tailCount });
-        sharedCandidates.push({ steps, shared: true });
-      } else if (side === 'right' && !b.hasRight && b.hasLeft && (b.leftLen + minGap + tailLen <= 20.001)) {
-        steps.push({ slotIdx: tailNode.slotIdx, side: 'right', count: tailCount });
-        sharedCandidates.push({ steps, shared: true });
+      // Вариант Б: полные слоты идут после s (s + 1 ... s + fullSlotsNeeded)
+      if (s + fullSlotsNeeded < N) {
+        let okAfter = true;
+        const stepsAfter = [{ slotIdx: tailSlotIdx, side: 'right', count: tailCount }];
+        for (let k = 1; k <= fullSlotsNeeded; k++) {
+          const slotIdx = route[s + k];
+          if (!getSlotOccupiedBounds(zone.slots[slotIdx]).isEmpty) { okAfter = false; break; }
+          stepsAfter.push({ slotIdx, side: 'left', count: spec.capacity });
+        }
+        if (okAfter) {
+          sharedCandidates.push({ steps: stepsAfter, shared: true });
+        }
       }
     }
   }
