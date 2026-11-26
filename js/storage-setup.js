@@ -26,16 +26,18 @@ function initSetup() {
   document.getElementById('batchNumber').addEventListener('input', updateSetupUI);
   document.getElementById('tiersMode').addEventListener('change', updateSetupUI);
 
-    document.querySelectorAll('.radio-card').forEach(card => {
+  document.querySelectorAll('.radio-card').forEach(card => {
     card.addEventListener('click', () => {
-      selectedWeight = parseInt(card.dataset.weight, 10);
+      selectedWeight = parseFloat(card.dataset.weight);
       document.getElementById('opt8').classList.toggle('active', selectedWeight === 8);
       document.getElementById('opt15').classList.toggle('active', selectedWeight === 15);
       document.getElementById('opt1').classList.toggle('active', selectedWeight === 1);
+      document.getElementById('opt08').classList.toggle('active', selectedWeight === 0.8);
       card.querySelector('input').checked = true;
       updateSetupUI();
     });
   });
+
 
 
   document.getElementById('resetBtn').addEventListener('click', () => {

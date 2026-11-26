@@ -8,6 +8,7 @@ function getCargoTitle(weight) {
   if (weight === 1) return 'Биг-бэг 1 т';
   if (weight === 8) return 'Рулон 8 т';
   if (weight === 15) return 'Рулон 15 т';
+  if (weight === 0.8) return 'Паллета 0.8 т';
   return `Груз ${weight} т`;
 }
 
@@ -110,48 +111,65 @@ function renderViewPage(state) {
     emptyTr.innerHTML = `<td colspan="7" style="text-align:center; color:#656d76; padding:18px;">На этой площадке нет размещенных партий</td>`;
     tbody.appendChild(emptyTr);
   } else {
-        zoneBatches.forEach(b => {
+    zoneBatches.forEach(b => {
       const cargoName = getCargoTitle(b.weight);
+      const spec = typeof ROLL_SPECS !== 'undefined' ? ROLL_SPECS[b.weight] : null;
+      const isCoil = spec ? spec.shape === 'coil' : (b.weight === 8 || b.weight === 15);
+
+      const btnHtml = isCoil
+        ? `<button type="button" class="btn-ship" data-id="${b.id}" data-mode="ktk" style="background:#2da44e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer;">
+             🚚 Отгрузить в КТК
+           </button>`
+        : `<button type="button" class="btn-ship" data-id="${b.id}" data-mode="remove" style="background:#57606a; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer;">
+             📤 Убрать с площадки
+           </button>`;
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><span class="swatch" style="background:${b.color}; vertical-align:middle; margin-right:6px;"></span><strong>Партия №${b.id}</strong></td>
         <td><strong>${b.zoneName}</strong></td>
         <td><strong>${cargoName}</strong></td>
         <td><strong>${b.placed} шт.</strong></td>
-        <td>${(b.placed * b.weight).toLocaleString('ru-RU')} т</td>
+        <td>${+(b.placed * b.weight).toFixed(1).toLocaleString('ru-RU')} т</td>
         <td style="font-size:13px; color:#57606a;">${b.slotsList.join(', ') || '—'}</td>
-        <td>
-          <button type="button" class="btn-ship" data-id="${b.id}" style="background:#2da44e; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:600; cursor:pointer;">
-            🚚 Отгрузить в КТК
-          </button>
-        </td>
+        <td>${btnHtml}</td>
       `;
       tbody.appendChild(tr);
     });
+
   }
 
   document.querySelectorAll('.btn-ship').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.dataset.id, 10);
+      const mode = btn.dataset.mode;
       const batch = state.batches.find(item => item.id === id);
       if (!batch) return;
 
-      if (confirm(`Отгрузить Партию №${batch.id} (${batch.placed} шт. по ${batch.weight} т) с «${batch.zoneName}» в калькулятор КТК?\nСлоты ${batch.slotsList.join(', ')} будут освобождены.`)) {
-        shipBatchFromStorage(state, id);
-        saveStorageState(state);
+      if (mode === 'ktk') {
+        if (confirm(`Отгрузить Партию №${batch.id} (${batch.placed} шт. по ${batch.weight} т) с «${batch.zoneName}» в калькулятор КТК?\nСлоты ${batch.slotsList.join(', ')} будут освобождены.`)) {
+          shipBatchFromStorage(state, id);
+          saveStorageState(state);
 
-        const deltaMin = +(Math.random() * 0.9 + 0.1).toFixed(1);
-        const deltaMax = +(Math.random() * 0.9 + 0.1).toFixed(1);
-        const minW = Math.max(0.5, +(batch.weight - deltaMin).toFixed(1));
-        const maxW = +(batch.weight + deltaMax).toFixed(1);
+          const deltaMin = +(Math.random() * 0.9 + 0.1).toFixed(1);
+          const deltaMax = +(Math.random() * 0.9 + 0.1).toFixed(1);
+          const minW = Math.max(0.5, +(batch.weight - deltaMin).toFixed(1));
+          const maxW = +(batch.weight + deltaMax).toFixed(1);
 
-        const params = new URLSearchParams({
-          count: batch.placed,
-          minWeight: minW,
-          maxWeight: maxW,
-          fromBatch: batch.id
-        });
-        window.location.href = `rolls.html?${params.toString()}`;
+          const params = new URLSearchParams({
+            count: batch.placed,
+            minWeight: minW,
+            maxWeight: maxW,
+            fromBatch: batch.id
+          });
+          window.location.href = `rolls.html?${params.toString()}`;
+        }
+      } else {
+        if (confirm(`Убрать Партию №${batch.id} (${getCargoTitle(batch.weight)}, ${batch.placed} шт.) с «${batch.zoneName}»?\nСлоты ${batch.slotsList.join(', ')} будут освобождены.`)) {
+          shipBatchFromStorage(state, id);
+          saveStorageState(state);
+          renderViewPage(state);
+        }
       }
     });
   });

@@ -216,16 +216,21 @@ function renderIsometricZone(canvasId, zone) {
           itemsInLayer.forEach(item => {
             const spec = ROLL_SPECS[item.weight] || ROLL_SPECS[8];
 
-            if (spec.shape === 'bag') {
-              const rowCount = spec.rows || 3;
-              const rowGap = (slotW - spec.width * rowCount) / (rowCount + 1);
-              const yStart = y0 + rowGap + row * (spec.width + rowGap);
-              const yEnd = yStart + spec.width;
-              const H = spec.height || 1.2;
-              const zBottom = (tier - 1) * H;
-              const zTop = tier * H;
-              drawIsoBigBag(ctx, toScreen, x0 + item.xStart, x0 + item.xEnd, yStart, yEnd, zBottom, zTop, item.color);
-            } else {
+              if (spec.shape === 'bag' || spec.shape === 'pallet') {
+                const rowCount = spec.rows || 3;
+                const rowGap = Math.max(0, (slotW - spec.width * rowCount) / (rowCount + 1));
+                const yStart = y0 + rowGap + row * (spec.width + rowGap);
+                const yEnd = yStart + spec.width;
+                const H = spec.height || 1.2;
+                const zBottom = (tier - 1) * H;
+                const zTop = tier * H;
+
+                if (spec.shape === 'pallet') {
+                  drawIsoPallet(ctx, toScreen, x0 + item.xStart, x0 + item.xEnd, yStart, yEnd, zBottom, zTop, item.color);
+                } else {
+                  drawIsoBigBag(ctx, toScreen, x0 + item.xStart, x0 + item.xEnd, yStart, yEnd, zBottom, zTop, item.color);
+                }
+              } else {
               const R = spec.diameter / 2;
               const rowGap = (slotW - spec.width * 2) / 3;
               const yStart = y0 + rowGap + row * (spec.width + rowGap);
@@ -397,4 +402,59 @@ function drawIsoCoil(ctx, toScreen, xCenter, yBack, yFront, zCenter, R, baseColo
   ctx.closePath();
   ctx.fillStyle = '#32383f';
   ctx.fill();
+}
+
+function drawIsoPallet(ctx, toScreen, x1, x2, y1, y2, z1, z2, baseColor) {
+  const padX = 0.03;
+  const padY = 0.03;
+  const px1 = x1 + padX, px2 = x2 - padX;
+  const py1 = y1 + padY, py2 = y2 - padY;
+
+  const palletH = 0.16; // высота деревянного поддона (160 мм)
+  const zPalletTop = z1 + palletH;
+
+  // Вспомогательная функция отрисовки параллелепипеда
+  const drawBox = (bx1, bx2, by1, by2, bz1, bz2, cLeft, cFront, cTop) => {
+    const b00 = toScreen(bx1, by1, bz1), b10 = toScreen(bx2, by1, bz1);
+    const b11 = toScreen(bx2, by2, bz1), b01 = toScreen(bx1, by2, bz1);
+    const t00 = toScreen(bx1, by1, bz2), t10 = toScreen(bx2, by1, bz2);
+    const t11 = toScreen(bx2, by2, bz2), t01 = toScreen(bx1, by2, bz2);
+
+    // Левая грань
+    ctx.beginPath();
+    ctx.moveTo(b00.x, b00.y); ctx.lineTo(b01.x, b01.y);
+    ctx.lineTo(t01.x, t01.y); ctx.lineTo(t00.x, t00.y);
+    ctx.closePath();
+    ctx.fillStyle = cLeft; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.7; ctx.stroke();
+
+    // Передняя грань
+    ctx.beginPath();
+    ctx.moveTo(b01.x, b01.y); ctx.lineTo(b11.x, b11.y);
+    ctx.lineTo(t11.x, t11.y); ctx.lineTo(t01.x, t01.y);
+    ctx.closePath();
+    ctx.fillStyle = cFront; ctx.fill(); ctx.stroke();
+
+    // Верхняя грань
+    ctx.beginPath();
+    ctx.moveTo(t00.x, t00.y); ctx.lineTo(t10.x, t10.y);
+    ctx.lineTo(t11.x, t11.y); ctx.lineTo(t01.x, t01.y);
+    ctx.closePath();
+    ctx.fillStyle = cTop; ctx.fill();
+    ctx.strokeStyle = '#1f2328'; ctx.lineWidth = 0.8; ctx.stroke();
+  };
+
+  // 1. Деревянный поддон снизу (тёплый древесный цвет)
+  drawBox(px1, px2, py1, py2, z1, zPalletTop, '#b08968', '#9c6644', '#ddb892');
+
+  // 2. Груз (короб/пакет в плёнке) на поддоне с небольшим отступом от краёв поддона
+  const cInset = 0.03;
+  drawBox(
+    px1 + cInset, px2 - cInset,
+    py1 + cInset, py2 - cInset,
+    zPalletTop, z2,
+    shadeColor(baseColor, -10),
+    shadeColor(baseColor, -22),
+    shadeColor(baseColor, 10)
+  );
 }

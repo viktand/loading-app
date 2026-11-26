@@ -8,15 +8,16 @@ const BATCH_COLORS = [
 ];
 
 const ROLL_SPECS = {
-  8:  { shape: 'coil', label: 'Рулон 8 т',   weight: 8,  diameter: 1.4, width: 1.25, basePairs: 14, topPairs: 13, capacity: 54 },
-  15: { shape: 'coil', label: 'Рулон 15 т',  weight: 15, diameter: 1.8, width: 1.50, basePairs: 11, topPairs: 10, capacity: 42 },
-  1:  { shape: 'bag',  label: 'Биг-бэг 1 т', weight: 1,  diameter: 1.0, width: 1.00, height: 1.2, cols: 20, rows: 3, tiers: 2, capacity: 120 }
+  8:   { shape: 'coil',   label: 'Рулон 8 т',     weight: 8,   diameter: 1.4, width: 1.25, basePairs: 14, topPairs: 13, capacity: 54 },
+  15:  { shape: 'coil',   label: 'Рулон 15 т',    weight: 15,  diameter: 1.8, width: 1.50, basePairs: 11, topPairs: 10, capacity: 42 },
+  1:   { shape: 'bag',    label: 'Биг-бэг 1 т',   weight: 1,   diameter: 1.0, width: 1.00, height: 1.2, cols: 20, rows: 3, tiers: 2, capacity: 120 },
+  0.8: { shape: 'pallet', label: 'Паллета 0.8 т', weight: 0.8, diameter: 0.8, width: 1.20, height: 1.3, cols: 25, rows: 3, tiers: 2, capacity: 150 }
 };
 
 function getEffectiveSpec(weight, maxTiers = 2) {
   const base = ROLL_SPECS[weight] || ROLL_SPECS;
   if (maxTiers === 1) {
-    if (base.shape === 'bag') {
+    if (base.shape === 'bag' || base.shape === 'pallet') {
       return { ...base, tiers: 1, capacity: base.cols * base.rows }; // 60 шт.
     }
     return { ...base, topPairs: 0, capacity: base.basePairs * 2 }; // 28 шт. (8т) или 22 шт. (15т)
@@ -110,8 +111,8 @@ function buildSlotPositions(spec, side = 'left') {
   const slotL = 20.0;
   const rev = (side === 'right');
   
-  // Если это биг-бэги — укладываем вертикальными столбцами (3 ряда × 2 яруса) вдоль длины слота
-  if (spec.shape === 'bag') {
+  // Если это биг-бэги или паллеты — укладываем вертикальными столбцами (3 ряда × 2 яруса) вдоль длины слота
+    if (spec.shape === 'bag' || spec.shape === 'pallet') {
     for (let c = 0; c < spec.cols; c++) {
       const xStart = rev ? (slotL - (c + 1) * D) : (c * D);
       const xEnd   = rev ? (slotL - c * D)       : ((c + 1) * D);
