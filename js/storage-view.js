@@ -33,7 +33,7 @@ function initView() {
   }
 
   const resetHandler = () => {
-    if (confirm('Сбросить все площадки и партии к исходным двум площадкам (5×3 и 3×3)?')) {
+    if (confirm('Сбросить все площадки и партии к исходным двум площадкам (5×5 и 5×3)?')) {
       clearStorageState();
       window.location.href = 'storage-setup.html';
     }

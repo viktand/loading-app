@@ -41,11 +41,12 @@ function initSetup() {
 
 
   document.getElementById('resetBtn').addEventListener('click', () => {
-    if (confirm('Сбросить все площадки и партии к исходным двум площадкам (5×3 и 3×3)?')) {
+    if (confirm('Сбросить все площадки и партии к исходным двум площадкам (5×5 и 3×5)?')) {
       clearStorageState();
       window.location.reload();
     }
   });
+
 
   document.getElementById('setupForm').addEventListener('submit', e => {
     e.preventDefault();
@@ -100,10 +101,10 @@ function renderZoneTabs() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn-add-zone';
-  addBtn.textContent = '+ Добавить площадку (3×3)';
+  addBtn.textContent = '+ Добавить площадку (3×5)';
   addBtn.addEventListener('click', () => {
     const nextId = state.zones.reduce((m, z) => Math.max(m, z.id), 0) + 1;
-    const newZone = createZoneObj(nextId, `Площадка ${nextId}`, 3, 3);
+    const newZone = createZoneObj(nextId, `Площадка ${nextId}`, 3, 5);
     state.zones.push(newZone);
     state.activeZoneId = nextId;
     saveStorageState(state);

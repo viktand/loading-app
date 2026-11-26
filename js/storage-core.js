@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'coil_storage_state_v4';
+const STORAGE_KEY = 'coil_storage_state_v5';
 
 const BATCH_COLORS = [
   '#4dabf7', '#51cf66', '#fcc419', '#ff8787',
@@ -18,13 +18,12 @@ function getEffectiveSpec(weight, maxTiers = 2) {
   const base = ROLL_SPECS[weight] || ROLL_SPECS;
   if (maxTiers === 1) {
     if (base.shape === 'bag' || base.shape === 'pallet') {
-      return { ...base, tiers: 1, capacity: base.cols * base.rows }; // 60 шт.
+      return { ...base, tiers: 1, capacity: base.cols * base.rows };
     }
-    return { ...base, topPairs: 0, capacity: base.basePairs * 2 }; // 28 шт. (8т) или 22 шт. (15т)
+    return { ...base, topPairs: 0, capacity: base.basePairs * 2 };
   }
   return base;
 }
-
 
 function createZoneObj(id, name, slotsX, slotsY) {
   return {
@@ -36,7 +35,7 @@ function createZoneObj(id, name, slotsX, slotsY) {
       index: i,
       rollWeight: null,
       capacity: 0,
-      coils: [] // { batchId, color, weight, tier, row, side: 'left'|'right', xStart, xEnd }
+      coils: []
     }))
   };
 }
@@ -47,8 +46,8 @@ function getDefaultState() {
     lastBatchId: 0,
     batches: [],
     zones: [
-      createZoneObj(1, 'Площадка 1', 5, 3),
-      createZoneObj(2, 'Площадка 2', 3, 3)
+      createZoneObj(1, 'Площадка 1', 5, 5),
+      createZoneObj(2, 'Площадка 2', 3, 5)
     ]
   };
 }
@@ -85,17 +84,19 @@ function getZoneFreeSlotsCount(zone) {
   return zone.slots.filter(s => !s.coils || s.coils.length === 0).length;
 }
 
-// Маршрут слотов «змейкой» с указанием стороны входа (entrySide) и выхода (exitSide)
+// Маршрут слотов вертикальной «змейкой» (сверху вниз по колонкам):
+// Чётные колонки (c = 0, 2, 4...): сверху вниз (r = 0 -> slotsY - 1), вход слева
+// Нечётные колонки (c = 1, 3...): снизу вверх (r = slotsY - 1 -> 0), вход справа
 function getSnakeRoute(zone) {
   const route = [];
-  for (let r = 0; r < zone.slotsY; r++) {
-    const isEven = (r % 2 === 0);
-    if (isEven) {
-      for (let c = 0; c < zone.slotsX; c++) {
+  for (let c = 0; c < zone.slotsX; c++) {
+    const isEvenCol = (c % 2 === 0);
+    if (isEvenCol) {
+      for (let r = 0; r < zone.slotsY; r++) {
         route.push({ slotIdx: r * zone.slotsX + c, entrySide: 'left', exitSide: 'right' });
       }
     } else {
-      for (let c = zone.slotsX - 1; c >= 0; c--) {
+      for (let r = zone.slotsY - 1; r >= 0; r--) {
         route.push({ slotIdx: r * zone.slotsX + c, entrySide: 'right', exitSide: 'left' });
       }
     }
@@ -103,16 +104,13 @@ function getSnakeRoute(zone) {
   return route;
 }
 
-// Правило укладки: «два снизу — один сверху, потом снизу, потом сверху и т.д.»
-// side: 'left' (от 0 вправо) или 'right' (от 20.0 влево)
 function buildSlotPositions(spec, side = 'left') {
   const positions = [];
   const D = spec.diameter;
   const slotL = 20.0;
   const rev = (side === 'right');
-  
-  // Если это биг-бэги или паллеты — укладываем вертикальными столбцами (3 ряда × 2 яруса) вдоль длины слота
-    if (spec.shape === 'bag' || spec.shape === 'pallet') {
+
+  if (spec.shape === 'bag' || spec.shape === 'pallet') {
     for (let c = 0; c < spec.cols; c++) {
       const xStart = rev ? (slotL - (c + 1) * D) : (c * D);
       const xEnd   = rev ? (slotL - c * D)       : ((c + 1) * D);
@@ -139,12 +137,10 @@ function buildSlotPositions(spec, side = 'left') {
     positions.push({ tier: 2, row: 1, side, xStart, xEnd });
   };
 
-  // Первые два нижних ряда (p=0, p=1) и один верхний между ними (p=0)
   if (spec.basePairs >= 1) addBottomPair(0);
   if (spec.basePairs >= 2) addBottomPair(1);
   if (spec.topPairs >= 1)  addTopPair(0);
 
-  // Далее поочерёдно: один снизу (p), один сверху (p - 1)
   for (let p = 2; p < spec.basePairs; p++) {
     addBottomPair(p);
     if (p - 1 < spec.topPairs) {
@@ -155,7 +151,6 @@ function buildSlotPositions(spec, side = 'left') {
   return positions;
 }
 
-// Занятая длина слота со стороны 'left' и со стороны 'right' (в метрах)
 function getSlotOccupiedBounds(slot) {
   let leftLen = 0;
   let rightLen = 0;
@@ -175,16 +170,12 @@ function getSlotOccupiedBounds(slot) {
   return { hasLeft, hasRight, leftLen, rightLen, isEmpty: !hasLeft && !hasRight };
 }
 
-// Длина хвоста для заданного числа рулонов (в метрах)
 function getTailLengthMeters(spec, count) {
   if (count <= 0) return 0;
   const pos = buildSlotPositions(spec, 'left').slice(0, count);
   return pos.reduce((max, p) => Math.max(max, p.xEnd), 0);
 }
 
-// Поиск лучшего плана размещения партии на конкретной площадке
-// Приоритет 1: стыковка хвостом навстречу существующему хвосту в неполном слоте (с зазором >= 2 * D)
-// Приоритет 2: размещение в полностью пустых слотах подряд
 function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
   const spec = getEffectiveSpec(weight, maxTiers);
   const fullSlotsNeeded = Math.floor(requestedCount / spec.capacity);
@@ -199,7 +190,7 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
   const sharedCandidates = [];
   const pureEmptyCandidates = [];
 
-  // 1. Прямой ход по змейке
+  // 1. Прямой ход по вертикальной змейке
   for (let s = 0; s <= N - totalSlotsNeeded; s++) {
     let ok = true;
     const steps = [];
@@ -232,7 +223,7 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
     }
   }
 
-  // 2. Встречный ход по змейке (для стыковки хвостов)
+  // 2. Встречный ход по вертикальной змейке (для стыковки хвостов в общем слоте)
   if (tailCount > 0) {
     for (let s = totalSlotsNeeded - 1; s < N; s++) {
       let ok = true;
@@ -267,7 +258,7 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
 
 function pickDistinctBatchColor(state, batchId) {
   const usedColors = new Set(state.batches.map(b => b.color));
-  const lastColor = state.batches.length > 0 ? state.batches[state.batches.length - 1].color : null;
+  const lastColor = state.batches.length > 0 ? state.batches.at(-1).color : null;
   const unused = BATCH_COLORS.filter(c => !usedColors.has(c));
   if (unused.length > 0) return unused[(batchId - 1) % unused.length];
   const diff = BATCH_COLORS.filter(c => c !== lastColor);
@@ -299,61 +290,53 @@ function placeBatchNoSplit(state, preferredZoneId, weight, requestedCount, custo
   const maxActiveId = state.batches.reduce((max, b) => Math.max(max, b.id), 0);
   const currentMaxId = Math.max(state.lastBatchId || 0, maxActiveId);
   const batchId = customBatchId && customBatchId > 0 ? customBatchId : currentMaxId + 1;
-
   if (state.batches.some(b => b.id === batchId)) {
-    return { ok: true, zoneId: targetZone.id };
-  }
-
-  state.lastBatchId = Math.max(currentMaxId, batchId);
-  const color = pickDistinctBatchColor(state, batchId);
-  const spec = getEffectiveSpec(weight, maxTiers);
-  const touchedSlots = [];
-
-  chosenPlan.steps.forEach(step => {
-    const slot = targetZone.slots[step.slotIdx];
-    if (!slot.coils) slot.coils = [];
-    if (!slot.rollWeight) slot.rollWeight = weight;
-    slot.capacity = spec.capacity;
-
-    const positions = buildSlotPositions(spec, step.side);
-    for (let k = 0; k < step.count; k++) {
-      const pos = positions[k];
-      slot.coils.push({
-        batchId: batchId,
-        color: color,
-        weight: weight,
-        tier: pos.tier,
-        row: pos.row,
-        side: step.side,
-        xStart: pos.xStart,
-        xEnd: pos.xEnd
-      });
-    }
-    touchedSlots.push(`#${step.slotIdx + 1}`);
-  });
-
-  state.activeZoneId = targetZone.id;
-  state.batches.push({
-    id: batchId,
-    zoneId: targetZone.id,
-    zoneName: targetZone.name,
-    weight: weight,
-    tiers: maxTiers,
-    requested: requestedCount,
-    placed: requestedCount,
-    color: color,
-    slotsList: touchedSlots
-  });
-
-  return {
-    ok: true,
-    zoneId: targetZone.id,
-    relocated: targetZone.id !== preferredZoneId,
-    shared: chosenPlan.shared
-  };
+return { ok: true, zoneId: targetZone.id };
 }
-
-// Отгрузка партии: удаляет только рулоны выбранной партии, оставляя встречную партию в общем слоте нетронутой
+state.lastBatchId = Math.max(currentMaxId, batchId);
+const color = pickDistinctBatchColor(state, batchId);
+const spec = getEffectiveSpec(weight, maxTiers);
+const touchedSlots = [];
+chosenPlan.steps.forEach(step => {
+const slot = targetZone.slots[step.slotIdx];
+if (!slot.coils) slot.coils = [];
+if (!slot.rollWeight) slot.rollWeight = weight;
+slot.capacity = spec.capacity;
+const positions = buildSlotPositions(spec, step.side);
+for (let k = 0; k < step.count; k++) {
+const pos = positions[k];
+slot.coils.push({
+batchId: batchId,
+color: color,
+weight: weight,
+tier: pos.tier,
+row: pos.row,
+side: step.side,
+xStart: pos.xStart,
+xEnd: pos.xEnd
+});
+}
+touchedSlots.push(`#${step.slotIdx + 1}`);
+});
+state.activeZoneId = targetZone.id;
+state.batches.push({
+id: batchId,
+zoneId: targetZone.id,
+zoneName: targetZone.name,
+weight: weight,
+tiers: maxTiers,
+requested: requestedCount,
+placed: requestedCount,
+color: color,
+slotsList: touchedSlots
+});
+return {
+ok: true,
+zoneId: targetZone.id,
+relocated: targetZone.id !== preferredZoneId,
+shared: chosenPlan.shared
+};
+}
 function shipBatchFromStorage(state, batchId) {
 const batchIdx = state.batches.findIndex(b => b.id === batchId);
 if (batchIdx === -1) return null;
@@ -367,7 +350,7 @@ if (slot.coils.length === 0) {
 slot.rollWeight = null;
 slot.capacity = 0;
 } else {
-const remWeight = slot.coils.weight;
+const remWeight = slot.coils.at(0).weight;
 slot.rollWeight = remWeight;
 slot.capacity = (ROLL_SPECS[remWeight] || ROLL_SPECS).capacity;
 }
