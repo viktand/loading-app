@@ -187,7 +187,7 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
   const sharedCandidates = [];
   const pureEmptyCandidates = [];
 
-  // 1. Размещение в полностью пустые слоты подряд (все слоты заполняются слева направо: side = 'left')
+  // 1. Размещение в полностью пустые слоты подряд по вертикальной змейке (слева направо: side = 'left')
   for (let s = 0; s <= N - totalSlotsNeeded; s++) {
     let ok = true;
     const steps = [];
@@ -218,12 +218,9 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
       const tailSlotIdx = route[s];
       const b = getSlotOccupiedBounds(zone.slots[tailSlotIdx]);
 
-      // Слот должен быть занят слева (первым хвостом) и свободен справа с достаточным зазором
       if (!b.hasLeft || b.hasRight) continue;
       if (b.leftLen + minGap + tailLen > 20.001) continue;
 
-      // Проверяем, можно ли разместить остальные полные слоты партии подряд перед s (или после s)
-      // Вариант А: полные слоты идут перед s (s - fullSlotsNeeded ... s - 1)
       if (s - fullSlotsNeeded >= 0) {
         let okBefore = true;
         const stepsBefore = [];
@@ -238,7 +235,6 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
         }
       }
 
-      // Вариант Б: полные слоты идут после s (s + 1 ... s + fullSlotsNeeded)
       if (s + fullSlotsNeeded < N) {
         let okAfter = true;
         const stepsAfter = [{ slotIdx: tailSlotIdx, side: 'right', count: tailCount }];
@@ -256,7 +252,266 @@ function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
 
   if (sharedCandidates.length > 0) return sharedCandidates.at(0);
   if (pureEmptyCandidates.length > 0) return pureEmptyCandidates.at(0);
+
+  // 3. Резервное правило: поиск непрерывного блока слотов, примыкающих друг к другу узкой стороной (внутри одного горизонтального ряда)
+  if (totalSlotsNeeded <= zone.slotsX) {
+    for (let r = 0; r < zone.slotsY; r++) {
+      for (let startC = 0; startC <= zone.slotsX - totalSlotsNeeded; startC++) {
+        let ok = true;
+        const steps = [];
+
+        for (let k = 0; k < fullSlotsNeeded; k++) {
+          const slotIdx = r * zone.slotsX + (startC + k);
+          if (!getSlotOccupiedBounds(zone.slots[slotIdx]).isEmpty) { ok = false; break; }
+          steps.push({ slotIdx, side: 'left', count: spec.capacity });
+        }
+        if (!ok) continue;
+
+        if (tailCount > 0) {
+          const tailSlotIdx = r * zone.slotsX + (startC + fullSlotsNeeded);
+          if (!getSlotOccupiedBounds(zone.slots[tailSlotIdx]).isEmpty) continue;
+          steps.push({ slotIdx: tailSlotIdx, side: 'left', count: tailCount });
+        }
+
+        return { steps, shared: false, endToEnd: true };
+      }
+    }
+  }
+
   return null;
+}
+// Возвращает список соседних индексов слотов (вверх, вниз, вправо, влево)
+function getNeighborSlotIndices(zone, idx) {
+  const r = Math.floor(idx / zone.slotsX);
+  const c = idx % zone.slotsX;
+  const neighbors = [];
+  if (r + 1 < zone.slotsY) neighbors.push((r + 1) * zone.slotsX + c);
+  if (r - 1 >= 0)          neighbors.push((r - 1) * zone.slotsX + c);
+  if (c + 1 < zone.slotsX) neighbors.push(r * zone.slotsX + (c + 1));
+  if (c - 1 >= 0)          neighbors.push(r * zone.slotsX + (c - 1));
+  return neighbors;
+}
+
+// Считает периметр набора слотов (чем меньше число, тем компактнее «куча»)
+function calcClusterPerimeter(zone, slotIndices) {
+  const set = new Set(slotIndices);
+  let sharedEdges = 0;
+
+  slotIndices.forEach(idx => {
+    const neighbors = getNeighborSlotIndices(zone, idx);
+    neighbors.forEach(nb => {
+      if (set.has(nb)) sharedEdges++;
+    });
+  });
+
+  // Каждое внутреннее ребро посчитано дважды (с двух сторон)
+  return 4 * slotIndices.length - sharedEdges;
+}
+
+// Считает, сколько сторон кластера опирается на границы площадки или уже занятые слоты (плотность прилегания)
+function calcBoundaryContactScore(zone, slotIndices) {
+  const set = new Set(slotIndices);
+  let contact = 0;
+
+  slotIndices.forEach(idx => {
+    const r = Math.floor(idx / zone.slotsX);
+    const c = idx % zone.slotsX;
+    if (r === 0 || r === zone.slotsY - 1) contact++;
+    if (c === 0 || c === zone.slotsX - 1) contact++;
+
+    const neighbors = getNeighborSlotIndices(zone, idx);
+    neighbors.forEach(nb => {
+      if (!set.has(nb) && !getSlotOccupiedBounds(zone.slots[nb]).isEmpty) {
+        contact++;
+      }
+    });
+  });
+
+  return contact;
+}
+
+// Находит наиболее компактный (с минимальным периметром) связный набор из neededCount пустых слотов,
+// обязательно включающий стартовый слот startIdx (или примыкающий к mustTouchIdx)
+function findCompactClusterFrom(zone, startIdx, neededCount, forbiddenIdx = -1) {
+  if (neededCount <= 0) return [];
+  if (startIdx === forbiddenIdx || !getSlotOccupiedBounds(zone.slots[startIdx]).isEmpty) return null;
+
+  const chosen = [startIdx];
+  const chosenSet = new Set([startIdx]);
+
+  // Жадное расширение ядра: на каждом шаге присоединяем такой соседний свободный слот,
+  // который даёт МИНИМАЛЬНЫЙ прирост периметра (т.е. имеет максимум общих граней с уже выбранными слотами)
+  while (chosen.length < neededCount) {
+    const frontier = new Set();
+    chosen.forEach(idx => {
+      getNeighborSlotIndices(zone, idx).forEach(nb => {
+        if (nb !== forbiddenIdx && !chosenSet.has(nb) && getSlotOccupiedBounds(zone.slots[nb]).isEmpty) {
+          frontier.add(nb);
+        }
+      });
+    });
+
+    if (frontier.size === 0) return null; // тупик, нужного количества связных слотов нет
+
+    let bestCandidate = -1;
+    let bestPerim = Infinity;
+    let bestContact = -1;
+
+    frontier.forEach(cand => {
+      const testGroup = [...chosen, cand];
+      const perim = calcClusterPerimeter(zone, testGroup);
+      const contact = calcBoundaryContactScore(zone, testGroup);
+
+      if (perim < bestPerim || (perim === bestPerim && contact > bestContact)) {
+        bestPerim = perim;
+        bestContact = contact;
+        bestCandidate = cand;
+      }
+    });
+
+    chosen.push(bestCandidate);
+    chosenSet.add(bestCandidate);
+  }
+
+  return chosen;
+}
+
+// Считает, на сколько изолированных кусков («островов») разбиваются оставшиеся пустые слоты
+function countRemainingFreeIslands(zone, usedSlotIndices) {
+  const usedSet = new Set(usedSlotIndices);
+  const visited = new Set();
+  let islands = 0;
+
+  for (let i = 0; i < zone.slots.length; i++) {
+    if (usedSet.has(i) || visited.has(i)) continue;
+    if (!getSlotOccupiedBounds(zone.slots[i]).isEmpty) continue;
+
+    // Нашли новый несвязанный остров пустых слотов — обходим его в ширину
+    islands++;
+    const queue = [i];
+    visited.add(i);
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      getNeighborSlotIndices(zone, curr).forEach(nb => {
+        if (!usedSet.has(nb) && !visited.has(nb) && getSlotOccupiedBounds(zone.slots[nb]).isEmpty) {
+          visited.add(nb);
+          queue.push(nb);
+        }
+      });
+    }
+  }
+
+  return islands;
+}
+
+// Упорядочивает слоты компактного кластера так, чтобы последний слот (под хвост) находился на краю кучи
+function orderClusterForTail(zone, cluster, tailSlotMustBeNextTo = -1) {
+  if (cluster.length <= 1) return cluster;
+  const set = new Set(cluster);
+
+  // Если хвост должен примыкать к конкретному слоту (при встречной стыковке), ставим этот слот в конец
+  if (tailSlotMustBeNextTo !== -1) {
+    const adj = cluster.find(idx => getNeighborSlotIndices(zone, idx).includes(tailSlotMustBeNextTo));
+    if (adj !== undefined) {
+      return [...cluster.filter(x => x !== adj), adj];
+    }
+  }
+
+  // Иначе выбираем в качестве последнего (неполного) слота ту ячейку кластера,
+  // у которой меньше всего соседей внутри кластера (угловой/краевой слот кучи)
+  let tailIdx = cluster.at(-1);
+  let minInternalDeg = Infinity;
+
+  cluster.forEach(idx => {
+    const deg = getNeighborSlotIndices(zone, idx).filter(nb => set.has(nb)).length;
+    if (deg <= minInternalDeg) {
+      minInternalDeg = deg;
+      tailIdx = idx;
+    }
+  });
+
+  return [...cluster.filter(x => x !== tailIdx), tailIdx];
+}
+
+function findZonePlacementPlan(zone, weight, requestedCount, maxTiers = 2) {
+  const spec = getEffectiveSpec(weight, maxTiers);
+  const fullSlotsNeeded = Math.floor(requestedCount / spec.capacity);
+  const tailCount = requestedCount % spec.capacity;
+  const totalSlotsNeeded = fullSlotsNeeded + (tailCount > 0 ? 1 : 0);
+  const tailLen = getTailLengthMeters(spec, tailCount);
+  const minGap = 2 * spec.diameter;
+
+  const allIndices = Array.from({ length: zone.slots.length }, (_, i) => i);
+
+  // 1. Приоритет: встречная стыковка хвостом в неполный слот + компактная куча с минимальным периметром
+  if (tailCount > 0) {
+    let bestShared = null;
+    let bestScore = Infinity;
+
+    for (const tailSlotIdx of allIndices) {
+      const b = getSlotOccupiedBounds(zone.slots[tailSlotIdx]);
+      if (!b.hasLeft || b.hasRight) continue;
+      if (b.leftLen + minGap + tailLen > 20.001) continue;
+
+      if (fullSlotsNeeded === 0) {
+        return {
+          steps: [{ slotIdx: tailSlotIdx, side: 'right', count: tailCount }],
+          shared: true
+        };
+      }
+
+      const adjNeighbors = getNeighborSlotIndices(zone, tailSlotIdx);
+      for (const adj of adjNeighbors) {
+        const cluster = findCompactClusterFrom(zone, adj, fullSlotsNeeded, tailSlotIdx);
+        if (cluster) {
+          const fullWithTail = [...cluster, tailSlotIdx];
+          const perim = calcClusterPerimeter(zone, fullWithTail);
+          const contact = calcBoundaryContactScore(zone, fullWithTail);
+          const freeIslands = countRemainingFreeIslands(zone, fullWithTail);
+          const score = perim * 1000 + freeIslands * 500 - contact;
+
+          if (score < bestScore) {
+            bestScore = score;
+            const orderedFull = orderClusterForTail(zone, cluster, tailSlotIdx);
+            const steps = orderedFull.map(idx => ({ slotIdx: idx, side: 'left', count: spec.capacity }));
+            steps.push({ slotIdx: tailSlotIdx, side: 'right', count: tailCount });
+            bestShared = { steps, shared: true };
+          }
+        }
+      }
+    }
+
+    if (bestShared) return bestShared;
+  }
+
+  // 2. Поиск самого компактного кластера из totalSlotsNeeded пустых слотов (минимальный периметр)
+  let bestPure = null;
+  let bestPureScore = Infinity;
+
+  for (const startIdx of allIndices) {
+    const cluster = findCompactClusterFrom(zone, startIdx, totalSlotsNeeded);
+    if (!cluster) continue;
+
+    const perim = calcClusterPerimeter(zone, cluster);
+    const contact = calcBoundaryContactScore(zone, cluster);
+    const freeIslands = countRemainingFreeIslands(zone, cluster);
+    const score = perim * 1000 + freeIslands * 500 - contact;
+
+    if (score < bestPureScore) {
+      bestPureScore = score;
+      const ordered = orderClusterForTail(zone, cluster);
+      const steps = [];
+      for (let k = 0; k < fullSlotsNeeded; k++) {
+        steps.push({ slotIdx: ordered[k], side: 'left', count: spec.capacity });
+      }
+      if (tailCount > 0) {
+        steps.push({ slotIdx: ordered[fullSlotsNeeded], side: 'left', count: tailCount });
+      }
+      bestPure = { steps, shared: false };
+    }
+  }
+
+  return bestPure;
 }
 
 function pickDistinctBatchColor(state, batchId) {
