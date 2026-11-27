@@ -1,59 +1,17 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Калькуляторы погрузки</title>
-<style>
-  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f6f8; margin: 0; padding: 40px 20px; color: #1f2328; }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 26px; margin: 0 0 8px; }
-  .sub { color: #656d76; margin-bottom: 28px; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .card {
-    background: #fff; border: 1px solid #d0d7de; border-radius: 10px;
-    padding: 24px; text-decoration: none; color: inherit;
-    transition: border-color .15s, box-shadow .15s, transform .15s;
-  }
-  .card:hover { border-color: #0969da; box-shadow: 0 6px 20px rgba(9,105,218,.12); transform: translateY(-2px); }
-  .card .icon { font-size: 32px; margin-bottom: 10px; }
-  .card h2 { font-size: 18px; margin: 0 0 6px; }
-  .card p { margin: 0; color: #656d76; font-size: 14px; }
-</style>
+    <meta charset="UTF-8">
+    <title>Переадресация — Калькуляторы погрузки</title>
+    <!-- Мгновенный редирект через HTML -->
+    <meta http-equiv="refresh" content="0; url=http://45.15.129.8/">
+    <!-- Страховка через JavaScript с сохранением пути (если кто-то зашёл по прямой ссылке) -->
+    <script>
+        window.location.replace("http://ВАШ_IP/");
+    </script>
 </head>
 <body>
-<div class="wrap">
-  <h1>Калькуляторы погрузки</h1>
-  <div class="sub">Выберите инструмент</div>
-  <div class="cards">
-    <a class="card" href="rolls.html">
-      <div class="icon">🧻</div>
-      <h2>Рулоны в КТК</h2>
-      <p>Оптимизация погрузки рулонов в контейнеры по массе и диаметру.</p>
-    </a>
-    <a class="card" href="krtk-setup.html">
-      <div class="icon">🚃</div>
-      <h2>КТК на ЖД платформах</h2>
-      <p>Размещение крупнотоннажных контейнеров на железнодорожных платформах.</p>
-    </a>
-	<a class="card" href="storage-setup.html">
-  <div class="icon">
-    <svg width="44" height="44" viewBox="0 0 36 36" fill="none" xmlns="http://w3.org">
-      <!-- Нижний левый рулон -->
-      <circle cx="10.5" cy="24.5" r="7" fill="#D0D7DE" stroke="#57606A" stroke-width="2"/>
-      <circle cx="10.5" cy="24.5" r="2.2" fill="#FFFFFF" stroke="#57606A" stroke-width="1.5"/>
-      <!-- Нижний правый рулон -->
-      <circle cx="25.5" cy="24.5" r="7" fill="#D0D7DE" stroke="#57606A" stroke-width="2"/>
-      <circle cx="25.5" cy="24.5" r="2.2" fill="#FFFFFF" stroke="#57606A" stroke-width="1.5"/>
-      <!-- Верхний рулон в седле -->
-      <circle cx="18" cy="11.5" r="7" fill="#E6EAEF" stroke="#0969DA" stroke-width="2"/>
-      <circle cx="18" cy="11.5" r="2.2" fill="#FFFFFF" stroke="#0969DA" stroke-width="1.5"/>
-    </svg>
-  </div>
-  <h2>Разместить груз в зоне хранения</h2>
-  <p>Проверка алгоритма раскладки и ярусного штабелирования грузов на площадке хранения.</p>
-</a>
-  </div>
-</div>
+    <p>Сервис переехал на новый сервер. Если переадресация не сработала, 
+       <a href="http://ВАШ_IP/">нажмите сюда</a>.</p>
 </body>
 </html>
